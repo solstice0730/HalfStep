@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnp.*
+.npm/
+.yarn/
+
+# Expo / React Native
+.expo/
+.expo-shared/
+.expo-export-test/
+dist/
+build/
+web-build/
+android/
+ios/
+
+# Environment
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Mobile secrets / local config
+*.keystore
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+local.properties
+
+# User-local files
+KakaoTalk_*
+*.pem
+*.key
+*.crt
