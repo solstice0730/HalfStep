@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "HalfStep",
+    "slug": "halfstep",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "halfstep",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "아기의 오늘을 사진으로 기록하기 위해 카메라 접근 권한이 필요합니다."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FDF8F3"
+      }
+    }
+  }
+}

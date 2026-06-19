@@ -9,7 +9,7 @@ import { colors } from "@/shared/constants/colors";
 
 export type MainTabParamList = {
   Home: undefined;
-  Records: undefined;
+  Records: { draftImageUri?: string } | undefined;
   Family: undefined;
   Community: undefined;
 };
@@ -21,18 +21,19 @@ export function MainTabNavigator() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
+        tabBarShowLabel: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
           backgroundColor: colors.background,
           borderTopColor: colors.border,
-          height: 72,
+          height: 66,
           paddingBottom: 12,
           paddingTop: 8
         },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "700"
+        tabBarItemStyle: {
+          borderRadius: 18,
+          marginHorizontal: 8
         }
       }}
     >
