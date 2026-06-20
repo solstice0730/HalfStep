@@ -551,8 +551,8 @@ const styles = StyleSheet.create({
   dateGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
-    justifyContent: "space-between",
+    gap: 8,
+    justifyContent: "flex-start",
     marginTop: 10
   },
   dateCell: {
