@@ -172,22 +172,23 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     borderBottomWidth: 1,
     flexDirection: "row",
-    height: 56,
+    height: 60,
     justifyContent: "space-between",
-    paddingHorizontal: 16
+    paddingHorizontal: 20
   },
   backButton: {
     alignItems: "center",
     backgroundColor: colors.surfaceSoft,
     borderRadius: 999,
-    height: 36,
+    height: 44,
     justifyContent: "center",
-    width: 36
+    width: 44
   },
   navTitle: {
     color: colors.primaryDark,
     fontSize: 17,
-    fontWeight: "900"
+    fontWeight: "600",
+    lineHeight: 24
   },
   pointBadge: {
     backgroundColor: colors.blueSoft,
@@ -198,10 +199,13 @@ const styles = StyleSheet.create({
   pointText: {
     color: colors.primary,
     fontSize: 12,
-    fontWeight: "900"
+    fontWeight: "600",
+    lineHeight: 18
   },
   segment: {
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
     borderRadius: 16,
     flexDirection: "row",
     gap: 4,
@@ -214,10 +218,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 6,
     justifyContent: "center",
+    minHeight: 44,
     paddingVertical: 10
   },
   segmentActive: {
-    backgroundColor: colors.surface
+    backgroundColor: colors.surfaceSoft
   },
   segmentText: {
     color: colors.textMuted,
@@ -226,29 +231,33 @@ const styles = StyleSheet.create({
   },
   segmentActiveText: {
     color: colors.primary,
-    fontWeight: "900"
+    fontWeight: "600"
   },
   searchBox: {
     alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: 20,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
-    paddingHorizontal: 14,
+    minHeight: 52,
+    paddingHorizontal: 16,
     paddingVertical: 13
   },
   searchText: {
     color: colors.textMuted,
     flex: 1,
-    fontSize: 13
+    fontSize: 14,
+    lineHeight: 20
   },
   list: {
     gap: 12
   },
   postCard: {
-    borderRadius: 24,
+    borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
     padding: 16
   },
   postTop: {
@@ -260,8 +269,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.75)",
     borderRadius: 999,
     color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: "900",
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 18,
     paddingHorizontal: 10,
     paddingVertical: 5
   },
@@ -273,12 +283,12 @@ const styles = StyleSheet.create({
   likeText: {
     color: colors.textMuted,
     fontSize: 12,
-    fontWeight: "900"
+    fontWeight: "600"
   },
   postTitle: {
     color: colors.primaryDark,
     fontSize: 16,
-    fontWeight: "900",
+    fontWeight: "600",
     lineHeight: 23,
     marginTop: 12
   },
@@ -298,20 +308,22 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.62)",
     borderRadius: 999,
     color: colors.primary,
-    fontSize: 11,
-    fontWeight: "800",
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 18,
     paddingHorizontal: 8,
     paddingVertical: 5
   },
   askCard: {
     backgroundColor: colors.blueSoft,
-    borderRadius: 24,
+    borderRadius: 16,
     padding: 18
   },
   askTitle: {
     color: colors.primaryDark,
     fontSize: 20,
-    fontWeight: "900"
+    fontWeight: "600",
+    lineHeight: 28
   },
   askText: {
     color: colors.textMuted,
@@ -324,24 +336,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     borderRadius: 999,
     marginTop: 14,
+    minHeight: 48,
     paddingVertical: 12
   },
   askButtonText: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: "900"
+    fontWeight: "600"
   },
   qnaCard: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     padding: 16
   },
   question: {
     color: colors.primaryDark,
     fontSize: 15,
-    fontWeight: "900",
+    fontWeight: "600",
     lineHeight: 22
   },
   answer: {
@@ -355,18 +368,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSoft,
     borderRadius: 999,
     marginTop: 12,
+    minHeight: 36,
     paddingHorizontal: 12,
     paddingVertical: 8
   },
   pointButtonText: {
     color: colors.primary,
     fontSize: 12,
-    fontWeight: "900"
+    fontWeight: "600"
   },
   productCard: {
     alignItems: "center",
     backgroundColor: colors.greenSoft,
-    borderRadius: 24,
+    borderRadius: 16,
     minHeight: 220,
     justifyContent: "center",
     padding: 24
@@ -374,7 +388,7 @@ const styles = StyleSheet.create({
   productTitle: {
     color: colors.primaryDark,
     fontSize: 20,
-    fontWeight: "900",
+    fontWeight: "600",
     marginTop: 12
   },
   productText: {

@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors } from "@/shared/constants/colors";
+import { spacing } from "@/shared/constants/spacing";
 
 export function Screen({ children }: PropsWithChildren) {
   return (
@@ -20,11 +21,11 @@ const styles = StyleSheet.create({
     flex: 1
   },
   content: {
-    paddingBottom: 24
+    paddingBottom: spacing.xxl
   },
   inner: {
-    gap: 20,
-    paddingHorizontal: 16,
-    paddingTop: 12
+    gap: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg
   }
 });

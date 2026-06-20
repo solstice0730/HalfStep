@@ -501,80 +501,81 @@ const styles = StyleSheet.create({
   },
   fixedContent: {
     flex: 1,
-    gap: 14,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    paddingTop: 10
+    gap: 16,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    paddingTop: 16
   },
   topNav: {
     alignItems: "center",
     borderBottomColor: colors.border,
     borderBottomWidth: 1,
     flexDirection: "row",
-    height: 56,
+    height: 60,
     justifyContent: "space-between",
-    paddingHorizontal: 16
+    paddingHorizontal: 20
   },
   editorHeader: {
     alignItems: "center",
     borderBottomColor: colors.border,
     borderBottomWidth: 1,
     flexDirection: "row",
-    height: 58,
+    height: 60,
     justifyContent: "space-between",
-    paddingHorizontal: 16
+    paddingHorizontal: 20
   },
   iconButton: {
     alignItems: "center",
     backgroundColor: colors.surfaceSoft,
     borderRadius: 999,
-    height: 42,
+    height: 44,
     justifyContent: "center",
-    width: 42
+    width: 44
   },
   navTitle: {
     color: colors.primaryDark,
     fontSize: 17,
-    fontWeight: "900"
+    fontWeight: "600",
+    lineHeight: 24
   },
   diaryButton: {
     alignItems: "center",
     backgroundColor: colors.accent,
     borderRadius: 999,
     flexDirection: "row",
-    gap: 5,
-    minHeight: 42,
+    gap: 8,
+    minHeight: 44,
     minWidth: 74,
     justifyContent: "center",
-    paddingHorizontal: 13
+    paddingHorizontal: 16
   },
   diaryButtonText: {
     color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "900"
+    fontSize: 13,
+    fontWeight: "600"
   },
   saveButton: {
     alignItems: "center",
     backgroundColor: colors.primary,
     borderRadius: 999,
     flexDirection: "row",
-    gap: 5,
-    minHeight: 42,
+    gap: 8,
+    minHeight: 44,
     minWidth: 74,
     justifyContent: "center",
-    paddingHorizontal: 13
+    paddingHorizontal: 16
   },
   saveButtonText: {
     color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "900"
+    fontSize: 13,
+    fontWeight: "600"
   },
   calendarCard: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 24,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 14
+    padding: 16
   },
   calendarHeader: {
     alignItems: "center",
@@ -583,8 +584,9 @@ const styles = StyleSheet.create({
   },
   monthTitle: {
     color: colors.primaryDark,
-    fontSize: 20,
-    fontWeight: "900"
+    fontSize: 18,
+    fontWeight: "600",
+    lineHeight: 26
   },
   photoBadge: {
     alignItems: "center",
@@ -597,8 +599,9 @@ const styles = StyleSheet.create({
   },
   photoBadgeText: {
     color: colors.primary,
-    fontSize: 11,
-    fontWeight: "900"
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 18
   },
   weekRow: {
     flexDirection: "row",
@@ -608,7 +611,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     flex: 1,
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "500",
     textAlign: "center"
   },
   dateGrid: {
@@ -619,7 +622,7 @@ const styles = StyleSheet.create({
   dateCell: {
     alignItems: "center",
     borderRadius: 15,
-    height: 40,
+    minHeight: 44,
     justifyContent: "center",
     marginVertical: 3,
     overflow: "hidden",
@@ -632,7 +635,7 @@ const styles = StyleSheet.create({
   dateText: {
     color: colors.primaryDark,
     fontSize: 14,
-    fontWeight: "800"
+    fontWeight: "500"
   },
   dateTextActive: {
     color: colors.primary
@@ -660,7 +663,7 @@ const styles = StyleSheet.create({
   thumbnailDateText: {
     color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: "900"
+    fontWeight: "600"
   },
   previewCard: {
     flex: 1,
@@ -671,29 +674,31 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end"
   },
   previewImage: {
-    borderRadius: 24
+    borderRadius: 16
   },
   previewOverlay: {
     backgroundColor: "rgba(45,37,32,0.38)",
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    padding: 18
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    padding: 16
   },
   previewDate: {
     color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: "800"
+    fontWeight: "500",
+    lineHeight: 18
   },
   previewTitle: {
     color: "#FFFFFF",
-    fontSize: 21,
-    fontWeight: "900",
+    fontSize: 20,
+    fontWeight: "600",
+    lineHeight: 28,
     marginTop: 5
   },
   emptyStory: {
     alignItems: "center",
     backgroundColor: colors.blueSoft,
-    borderRadius: 24,
+    borderRadius: 16,
     flex: 1,
     justifyContent: "center",
     padding: 20
@@ -701,7 +706,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     color: colors.primaryDark,
     fontSize: 17,
-    fontWeight: "900",
+    fontWeight: "600",
     marginTop: 12
   },
   emptyText: {
@@ -714,11 +719,11 @@ const styles = StyleSheet.create({
   editorBody: {
     flex: 1,
     gap: 12,
-    padding: 16
+    padding: 20
   },
   photoPicker: {
     backgroundColor: colors.blueSoft,
-    borderRadius: 24,
+    borderRadius: 16,
     height: 220,
     overflow: "hidden"
   },
@@ -734,23 +739,24 @@ const styles = StyleSheet.create({
   photoEmptyText: {
     color: colors.primary,
     fontSize: 15,
-    fontWeight: "900",
+    fontWeight: "600",
     marginTop: 10
   },
   titleInput: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
     color: colors.primaryDark,
     fontSize: 17,
-    fontWeight: "900",
+    fontWeight: "600",
+    minHeight: 52,
     padding: 14
   },
   bodyInput: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     color: colors.primaryDark,
     flex: 1,
@@ -801,7 +807,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     paddingBottom: 44,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 86,
     width: screenWidth
   },
@@ -811,7 +817,7 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   storyPhoto: {
-    borderRadius: 24,
+    borderRadius: 16,
     height: "100%",
     width: "100%"
   },
@@ -823,12 +829,14 @@ const styles = StyleSheet.create({
   fullStoryDate: {
     color: "rgba(255,255,255,0.78)",
     fontSize: 13,
-    fontWeight: "900"
+    fontWeight: "500",
+    lineHeight: 18
   },
   fullStoryTitle: {
     color: "#FFFFFF",
     fontSize: 24,
-    fontWeight: "900"
+    fontWeight: "600",
+    lineHeight: 32
   },
   fullStoryBody: {
     color: "#FFFFFF",

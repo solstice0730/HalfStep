@@ -4,7 +4,6 @@ import {
   Camera,
   ChevronDown,
   Flashlight,
-  MessageCircle,
   PenLine,
   RotateCcw,
   Send,
@@ -39,6 +38,8 @@ const curation = {
   text: "이 시기에는 수유 텀과 낮잠 리듬이 조금씩 달라져요. 오늘은 수유 간격, 낮잠 길이, 배변 변화를 같이 확인해보세요.",
   chips: ["수유 신호", "낮잠 루틴", "배변 체크"]
 };
+
+const chatbotHomeImage = require("../../../../assets/images/chatbot-home.png");
 
 type HomeScreenProps = BottomTabScreenProps<MainTabParamList, "Home">;
 
@@ -75,18 +76,8 @@ function BabyMascot() {
     outputRange: ["-2deg", "2deg"]
   });
 
-  const shadowScale = bob.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0.86]
-  });
-
   return (
     <View style={styles.mascotWrap}>
-      <View style={styles.mascotGlow} />
-      <Text style={styles.decorStarOne}>★</Text>
-      <Text style={styles.decorStarTwo}>✦</Text>
-      <Text style={styles.decorHeart}>♥</Text>
-      <Animated.View style={[styles.mascotShadow, { transform: [{ scaleX: shadowScale }] }]} />
       <Animated.Image
         source={require("../../../../assets/images/baby-character.png")}
         resizeMode="contain"
@@ -264,7 +255,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
 
       {currentPage === 1 && (
         <Pressable style={styles.chatFloat} onPress={() => setChatOpen(true)}>
-          <MessageCircle color="#FFFFFF" size={20} />
+          <Image source={chatbotHomeImage} resizeMode="contain" style={styles.chatFloatImage} />
         </Pressable>
       )}
 
@@ -298,7 +289,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
               </Pressable>
             </View>
             <View style={styles.chatBotFace}>
-              <Text style={styles.chatBotEmoji}>💬</Text>
+              <Image source={chatbotHomeImage} resizeMode="contain" style={styles.chatBotImage} />
             </View>
             <Text style={styles.chatQuestion}>리몽이의 기록을 바탕으로 무엇을 알려드릴까요?</Text>
             <Text style={styles.chatBubble}>예: 요즘 낮잠이 짧아졌는데 괜찮을까요?</Text>
@@ -324,10 +315,10 @@ const styles = StyleSheet.create({
   },
   homeRoot: {
     flex: 1,
-    gap: 13,
-    paddingBottom: 18,
-    paddingHorizontal: 18,
-    paddingTop: 14
+    gap: 16,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+    paddingTop: 16
   },
   header: {
     alignItems: "center",
@@ -342,7 +333,8 @@ const styles = StyleSheet.create({
   statusText: {
     color: colors.primaryDark,
     fontSize: 24,
-    fontWeight: "900"
+    fontWeight: "600",
+    lineHeight: 32
   },
   headerActions: {
     flexDirection: "row",
@@ -351,72 +343,36 @@ const styles = StyleSheet.create({
   quickButton: {
     alignItems: "center",
     backgroundColor: colors.accent,
-    borderRadius: 16,
-    height: 40,
+    borderRadius: 14,
+    height: 44,
     justifyContent: "center",
-    width: 40
+    width: 44
   },
   cameraButton: {
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    height: 40,
+    height: 44,
     justifyContent: "center",
-    width: 40
+    width: 44
   },
   mascotPanel: {
     flex: 1.15,
     justifyContent: "center",
-    minHeight: 202
+    minHeight: 304
   },
   mascotWrap: {
     alignItems: "center",
     alignSelf: "center",
-    height: 242,
+    height: 300,
     justifyContent: "center",
-    width: 320
-  },
-  mascotGlow: {
-    backgroundColor: "rgba(255,159,142,0.18)",
-    borderRadius: 130,
-    height: 220,
-    position: "absolute",
-    width: 286
-  },
-  decorStarOne: {
-    color: colors.accent,
-    fontSize: 24,
-    position: "absolute",
-    right: 44,
-    top: 40
-  },
-  decorStarTwo: {
-    color: colors.primary,
-    fontSize: 28,
-    left: 44,
-    position: "absolute",
-    top: 72
-  },
-  decorHeart: {
-    color: colors.accent,
-    fontSize: 22,
-    position: "absolute",
-    right: 76,
-    top: 124
-  },
-  mascotShadow: {
-    backgroundColor: "rgba(61,44,30,0.1)",
-    borderRadius: 999,
-    bottom: 18,
-    height: 18,
-    position: "absolute",
-    width: 130
+    width: 228
   },
   mascotImage: {
-    height: 232,
-    width: 232
+    height: 300,
+    width: 228
   },
   mascotBody: {
     alignItems: "center",
@@ -566,13 +522,14 @@ const styles = StyleSheet.create({
   },
   babyName: {
     color: colors.primaryDark,
-    fontSize: 17,
-    fontWeight: "900"
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 24
   },
   dayText: {
     color: colors.primaryDark,
-    fontSize: 46,
-    fontWeight: "900",
+    fontSize: 42,
+    fontWeight: "700",
     letterSpacing: 0,
     lineHeight: 52
   },
@@ -582,14 +539,16 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     flexDirection: "row",
     gap: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 13
+    minHeight: 52,
+    paddingHorizontal: 16,
+    paddingVertical: 12
   },
   questionText: {
     color: colors.textMuted,
     flex: 1,
     fontSize: 15,
-    fontWeight: "700"
+    fontWeight: "400",
+    lineHeight: 22
   },
   sendButton: {
     alignItems: "center",
@@ -603,10 +562,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderLeftColor: colors.accent,
-    borderLeftWidth: 4,
-    borderRadius: 22,
+    borderLeftWidth: 3,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 13
+    padding: 16
   },
   curationHeader: {
     alignItems: "center",
@@ -615,28 +574,32 @@ const styles = StyleSheet.create({
   },
   curationTitle: {
     color: colors.primaryDark,
-    fontSize: 15,
-    fontWeight: "900"
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 24
   },
   curationText: {
     color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 7
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8
   },
   chipRow: {
     flexDirection: "row",
-    gap: 6,
-    marginTop: 9
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12
   },
   chip: {
     backgroundColor: colors.blueSoft,
     borderRadius: 999,
     color: colors.primary,
-    fontSize: 10,
-    fontWeight: "800",
-    paddingHorizontal: 8,
-    paddingVertical: 5
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 7
   },
   pageDots: {
     alignItems: "center",
@@ -660,16 +623,20 @@ const styles = StyleSheet.create({
   },
   chatFloat: {
     alignItems: "center",
-    backgroundColor: colors.primary,
-    borderColor: colors.surface,
+    backgroundColor: "transparent",
+    borderColor: "transparent",
     borderRadius: 999,
-    borderWidth: 3,
+    borderWidth: 0,
     bottom: 18,
-    height: 54,
+    height: 58,
     justifyContent: "center",
     position: "absolute",
-    right: 18,
-    width: 54
+    right: 20,
+    width: 58
+  },
+  chatFloatImage: {
+    height: 56,
+    width: 56
   },
   cameraRoot: {
     backgroundColor: colors.background,
@@ -680,7 +647,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     left: 0,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 12,
     position: "absolute",
     right: 0,
@@ -690,7 +657,8 @@ const styles = StyleSheet.create({
   cameraTitle: {
     color: colors.primaryDark,
     fontSize: 16,
-    fontWeight: "900"
+    fontWeight: "600",
+    lineHeight: 24
   },
   cameraTopActions: {
     flexDirection: "row",
@@ -706,9 +674,9 @@ const styles = StyleSheet.create({
   },
   cameraStage: {
     backgroundColor: "#111111",
-    borderRadius: 30,
+    borderRadius: 24,
     flex: 1,
-    margin: 14,
+    margin: 20,
     marginTop: 66,
     overflow: "hidden"
   },
@@ -725,7 +693,7 @@ const styles = StyleSheet.create({
   permissionTitle: {
     color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: "900",
+    fontWeight: "600",
     marginTop: 14
   },
   permissionText: {
@@ -739,18 +707,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 999,
     marginTop: 18,
-    paddingHorizontal: 18,
+    minHeight: 44,
+    paddingHorizontal: 20,
     paddingVertical: 12
   },
   permissionButtonText: {
     color: colors.primaryDark,
     fontSize: 14,
-    fontWeight: "900"
+    fontWeight: "600"
   },
   cameraBottom: {
     backgroundColor: colors.background,
     paddingBottom: 26,
-    paddingHorizontal: 22,
+    paddingHorizontal: 20,
     paddingTop: 18
   },
   capturePanel: {
@@ -774,7 +743,7 @@ const styles = StyleSheet.create({
   },
   recordPrompt: {
     backgroundColor: colors.surface,
-    borderRadius: 24,
+    borderRadius: 16,
     padding: 16
   },
   shotPreview: {
@@ -787,7 +756,7 @@ const styles = StyleSheet.create({
   recordPromptTitle: {
     color: colors.primaryDark,
     fontSize: 17,
-    fontWeight: "900",
+    fontWeight: "600",
     textAlign: "center"
   },
   recordPromptText: {
@@ -807,36 +776,38 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSoft,
     borderRadius: 999,
     flex: 1,
+    minHeight: 44,
     paddingVertical: 12
   },
   retakeButtonText: {
     color: colors.primaryDark,
     fontSize: 13,
-    fontWeight: "900"
+    fontWeight: "600"
   },
   addRecordButton: {
     alignItems: "center",
     backgroundColor: colors.accent,
     borderRadius: 999,
     flex: 1,
+    minHeight: 44,
     paddingVertical: 12
   },
   addRecordButtonText: {
     color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: "900"
+    fontWeight: "600"
   },
   modalBackdrop: {
     backgroundColor: "rgba(45,37,32,0.36)",
     flex: 1,
     justifyContent: "flex-end",
-    padding: 16
+    padding: 20
   },
   sheet: {
     backgroundColor: colors.background,
-    borderRadius: 28,
+    borderRadius: 24,
     gap: 14,
-    padding: 18
+    padding: 20
   },
   modalHeader: {
     alignItems: "center",
@@ -847,7 +818,8 @@ const styles = StyleSheet.create({
   modalTitle: {
     color: colors.primaryDark,
     fontSize: 19,
-    fontWeight: "900"
+    fontWeight: "600",
+    lineHeight: 26
   },
   modalText: {
     color: colors.textMuted,
@@ -857,36 +829,38 @@ const styles = StyleSheet.create({
   writeDiaryButton: {
     alignItems: "center",
     backgroundColor: colors.accent,
-    borderRadius: 18,
+    borderRadius: 16,
+    minHeight: 48,
     padding: 14
   },
   writeDiaryButtonText: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: "900",
+    fontWeight: "600",
   },
   chatModal: {
     alignItems: "center",
     backgroundColor: colors.background,
-    borderRadius: 28,
+    borderRadius: 24,
     gap: 14,
     padding: 20
   },
   chatBotFace: {
     alignItems: "center",
-    backgroundColor: colors.blueSoft,
+    backgroundColor: "transparent",
     borderRadius: 999,
-    height: 96,
+    height: 112,
     justifyContent: "center",
-    width: 96
+    width: 112
   },
-  chatBotEmoji: {
-    fontSize: 52
+  chatBotImage: {
+    height: 112,
+    width: 112
   },
   chatQuestion: {
     color: colors.primaryDark,
     fontSize: 18,
-    fontWeight: "900",
+    fontWeight: "600",
     lineHeight: 25,
     textAlign: "center"
   },
@@ -901,7 +875,7 @@ const styles = StyleSheet.create({
   subscriptionNote: {
     color: colors.primary,
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "600",
     textAlign: "center"
   }
 });

@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors } from "@/shared/constants/colors";
+import { spacing } from "@/shared/constants/spacing";
 
 type AppButtonProps = {
   label: string;
@@ -24,19 +25,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 999,
     flexDirection: "row",
-    gap: 8,
+    gap: spacing.sm,
     justifyContent: "center",
     minHeight: 48,
-    paddingHorizontal: 18
+    paddingHorizontal: spacing.xl
   },
   primary: {
     backgroundColor: colors.primary
   },
   secondary: {
-    backgroundColor: colors.secondary
+    backgroundColor: colors.primaryDark
   },
   ghost: {
-    backgroundColor: colors.surfaceSoft
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.border,
+    borderWidth: 1
   },
   icon: {
     height: 20,
@@ -46,7 +49,8 @@ const styles = StyleSheet.create({
   label: {
     color: colors.surface,
     fontSize: 15,
-    fontWeight: "800"
+    fontWeight: "600",
+    lineHeight: 22
   },
   ghostLabel: {
     color: colors.primaryDark

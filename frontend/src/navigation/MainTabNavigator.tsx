@@ -25,15 +25,15 @@ export function MainTabNavigator() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
-          backgroundColor: colors.background,
+          backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          height: 66,
-          paddingBottom: 12,
+          height: 70,
+          paddingBottom: 14,
           paddingTop: 8
         },
         tabBarItemStyle: {
-          borderRadius: 18,
-          marginHorizontal: 8
+          borderRadius: 16,
+          marginHorizontal: 6
         }
       }}
     >

@@ -1,25 +1,38 @@
-import { CheckCircle2, ChevronLeft, MessageCircle, Wifi } from "lucide-react-native";
-import { StyleSheet, Text, View } from "react-native";
+import { CheckCircle2, ChevronLeft, Wifi } from "lucide-react-native";
+import { Image, ImageSourcePropType, StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/shared/components/Screen";
 import { colors } from "@/shared/constants/colors";
 
+const familyIcons = {
+  defaultAvatar: require("../../../../assets/icons/family/avatar-default.png"),
+  mom: require("../../../../assets/icons/family/mom.png"),
+  dad: require("../../../../assets/icons/family/dad.png"),
+  grandma: require("../../../../assets/icons/family/grandma.png"),
+  grandpa: require("../../../../assets/icons/family/grandpa.png"),
+  baby: require("../../../../assets/icons/family/baby.png"),
+  familyRoom: require("../../../../assets/icons/family/family-room.png"),
+  largeFamilyRoom: require("../../../../assets/icons/family/large-family-room.png")
+} satisfies Record<string, ImageSourcePropType>;
+
+const chatbotShareImage = require("../../../../assets/images/chatbot-share.png");
+
 const rooms = [
-  { emoji: "🏠", title: "엄마 & 아빠방", meta: "현재 활성", active: false, members: ["👩", "👨"] },
-  { emoji: "👵", title: "할머니 돌봄방", meta: "1시간 전", active: true, members: ["👩", "👨", "👵"] }
+  { icon: familyIcons.familyRoom, title: "엄마 & 아빠방", meta: "현재 활성", active: false, members: [familyIcons.mom, familyIcons.dad] },
+  { icon: familyIcons.largeFamilyRoom, title: "할머니 돌봄방", meta: "1시간 전", active: true, members: [familyIcons.mom, familyIcons.dad, familyIcons.grandma] }
 ];
 
 const family = [
-  { emoji: "👩", name: "엄마", status: "온라인", active: true, color: colors.peachSoft },
-  { emoji: "👨", name: "아빠", status: "온라인", active: true, color: colors.blueSoft },
-  { emoji: "👵", name: "할머니", status: "자리비움", active: false, color: colors.greenSoft }
+  { icon: familyIcons.mom, name: "엄마", status: "온라인", active: true },
+  { icon: familyIcons.dad, name: "아빠", status: "온라인", active: true },
+  { icon: familyIcons.grandma, name: "할머니", status: "자리비움", active: false }
 ];
 
 const feeds = [
-  { emoji: "👨", text: "아빠가 배변 기록을 추가했습니다", detail: "늦 대시 보드 경우", time: "10분 전", color: colors.blueSoft },
-  { emoji: "👩", text: "엄마가 새로운 사진을 등록했습니다", detail: "오늘의 성장 일기에 추가됨", time: "32분 전", color: colors.peachSoft },
-  { emoji: "👨", text: "아빠가 수유를 기록했습니다", detail: "120ml · 오른쪽", time: "1시간 15분 전", color: colors.blueSoft },
-  { emoji: "👩", text: "엄마가 수면을 기록했습니다", detail: "낮잠 종료 · 1시간 30분", time: "2시간 전", color: colors.peachSoft }
+  { icon: familyIcons.dad, text: "아빠가 배변 기록을 추가했습니다", detail: "늦 대시 보드 경우", time: "10분 전" },
+  { icon: familyIcons.mom, text: "엄마가 새로운 사진을 등록했습니다", detail: "오늘의 성장 일기에 추가됨", time: "32분 전" },
+  { icon: familyIcons.dad, text: "아빠가 수유를 기록했습니다", detail: "120ml · 오른쪽", time: "1시간 15분 전" },
+  { icon: familyIcons.mom, text: "엄마가 수면을 기록했습니다", detail: "낮잠 종료 · 1시간 30분", time: "2시간 전" }
 ];
 
 export function FamilyRoomScreen() {
@@ -40,7 +53,7 @@ export function FamilyRoomScreen() {
               <View key={room.title} style={[styles.roomCard, room.active && styles.roomCardActive]}>
                 <View style={styles.roomLeft}>
                   <View style={[styles.roomIcon, room.active && styles.roomIconActive]}>
-                    <Text style={styles.roomEmoji}>{room.emoji}</Text>
+                    <Image source={room.icon} style={styles.roomIconImage} />
                   </View>
                   <View>
                     <Text style={[styles.roomTitle, room.active && styles.activeText]}>{room.title}</Text>
@@ -52,8 +65,8 @@ export function FamilyRoomScreen() {
                 </View>
                 <View style={styles.memberStack}>
                   {room.members.map((member, index) => (
-                    <View key={`${room.title}-${member}-${index}`} style={[styles.stackedAvatar, { marginLeft: index === 0 ? 0 : -8 }]}>
-                      <Text style={styles.stackedEmoji}>{member}</Text>
+                    <View key={`${room.title}-${index}`} style={[styles.stackedAvatar, { marginLeft: index === 0 ? 0 : -8 }]}>
+                      <Image source={member} style={styles.stackedAvatarImage} />
                     </View>
                   ))}
                   {room.active && <Text style={styles.activeBadge}>활성</Text>}
@@ -74,8 +87,8 @@ export function FamilyRoomScreen() {
           <View style={styles.familyRow}>
             {family.map((member) => (
               <View key={member.name} style={styles.familyMember}>
-                <View style={[styles.familyAvatar, { backgroundColor: member.color }]}>
-                  <Text style={styles.familyEmoji}>{member.emoji}</Text>
+                <View style={styles.familyAvatar}>
+                  <Image source={member.icon} style={styles.familyAvatarImage} />
                   {member.active && <View style={styles.statusDot} />}
                 </View>
                 <Text style={styles.familyName}>{member.name}</Text>
@@ -88,8 +101,8 @@ export function FamilyRoomScreen() {
         <View style={styles.feedList}>
           {feeds.map((feed) => (
             <View key={`${feed.text}-${feed.time}`} style={styles.feedCard}>
-              <View style={[styles.feedAvatar, { backgroundColor: feed.color }]}>
-                <Text style={styles.feedEmoji}>{feed.emoji}</Text>
+              <View style={styles.feedAvatar}>
+                <Image source={feed.icon} style={styles.feedAvatarImage} />
               </View>
               <View style={styles.feedTextBox}>
                 <Text style={styles.feedText}>
@@ -105,8 +118,7 @@ export function FamilyRoomScreen() {
         </View>
       </Screen>
       <View style={styles.chatButton}>
-        <MessageCircle color="#FFFFFF" size={18} />
-        <Text style={styles.chatText}>AI 챗봇</Text>
+        <Image source={chatbotShareImage} resizeMode="contain" style={styles.chatButtonImage} />
       </View>
     </View>
   );
@@ -122,30 +134,32 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     borderBottomWidth: 1,
     flexDirection: "row",
-    height: 56,
+    height: 60,
     justifyContent: "space-between",
-    paddingHorizontal: 16
+    paddingHorizontal: 20
   },
   backButton: {
     alignItems: "center",
     backgroundColor: colors.surfaceSoft,
     borderRadius: 999,
-    height: 36,
+    height: 44,
     justifyContent: "center",
-    width: 36
+    width: 44
   },
   navTitle: {
     color: colors.primaryDark,
     fontSize: 17,
-    fontWeight: "900"
+    fontWeight: "600",
+    lineHeight: 24
   },
   placeholder: {
-    width: 36
+    width: 44
   },
   kicker: {
     color: colors.textMuted,
     fontSize: 13,
-    fontWeight: "800"
+    fontWeight: "500",
+    lineHeight: 18
   },
   roomList: {
     gap: 12,
@@ -155,7 +169,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -175,23 +189,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surfaceSoft,
     borderRadius: 16,
-    height: 44,
+    height: 48,
     justifyContent: "center",
-    width: 44
+    overflow: "hidden",
+    width: 48
   },
   roomIconActive: {
-    backgroundColor: "#FFFFFF"
+    backgroundColor: colors.surfaceSoft
   },
-  roomEmoji: {
-    fontSize: 22
+  roomIconImage: {
+    height: 40,
+    opacity: 0.82,
+    width: 40
   },
   roomTitle: {
     color: colors.primaryDark,
-    fontSize: 15,
-    fontWeight: "900"
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 24
   },
   activeText: {
-    color: colors.primary
+    color: colors.primary,
+    fontWeight: "600"
   },
   roomMetaRow: {
     alignItems: "center",
@@ -218,23 +237,27 @@ const styles = StyleSheet.create({
   },
   stackedAvatar: {
     alignItems: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSoft,
     borderColor: colors.background,
     borderRadius: 999,
     borderWidth: 2,
-    height: 28,
+    height: 30,
     justifyContent: "center",
-    width: 28
+    overflow: "hidden",
+    width: 30
   },
-  stackedEmoji: {
-    fontSize: 14
+  stackedAvatarImage: {
+    height: 24,
+    opacity: 0.82,
+    width: 24
   },
   activeBadge: {
     backgroundColor: colors.primary,
     borderRadius: 999,
     color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "900",
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 18,
     marginLeft: 8,
     paddingHorizontal: 8,
     paddingVertical: 6
@@ -247,11 +270,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.primaryDark,
     fontSize: 18,
-    fontWeight: "900"
+    fontWeight: "600",
+    lineHeight: 26
   },
   syncBadge: {
     alignItems: "center",
-    backgroundColor: colors.greenSoft,
+    backgroundColor: colors.surfaceSoft,
     borderRadius: 999,
     flexDirection: "row",
     gap: 6,
@@ -260,8 +284,9 @@ const styles = StyleSheet.create({
   },
   syncText: {
     color: colors.success,
-    fontSize: 11,
-    fontWeight: "900"
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 18
   },
   familyRow: {
     flexDirection: "row",
@@ -273,13 +298,17 @@ const styles = StyleSheet.create({
   },
   familyAvatar: {
     alignItems: "center",
+    backgroundColor: colors.surfaceSoft,
     borderRadius: 999,
     height: 56,
     justifyContent: "center",
+    overflow: "hidden",
     width: 56
   },
-  familyEmoji: {
-    fontSize: 28
+  familyAvatarImage: {
+    height: 46,
+    opacity: 0.82,
+    width: 46
   },
   statusDot: {
     backgroundColor: colors.success,
@@ -294,13 +323,14 @@ const styles = StyleSheet.create({
   },
   familyName: {
     color: colors.primaryDark,
-    fontSize: 12,
-    fontWeight: "800",
+    fontSize: 13,
+    fontWeight: "600",
     marginTop: 6
   },
   familyStatus: {
     color: colors.textMuted,
-    fontSize: 10,
+    fontSize: 12,
+    lineHeight: 18,
     marginTop: 3
   },
   feedList: {
@@ -310,7 +340,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -318,13 +348,17 @@ const styles = StyleSheet.create({
   },
   feedAvatar: {
     alignItems: "center",
-    borderRadius: 999,
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: 14,
     height: 44,
     justifyContent: "center",
+    overflow: "hidden",
     width: 44
   },
-  feedEmoji: {
-    fontSize: 22
+  feedAvatarImage: {
+    height: 36,
+    opacity: 0.82,
+    width: 36
   },
   feedTextBox: {
     flex: 1
@@ -336,7 +370,7 @@ const styles = StyleSheet.create({
   },
   feedStrong: {
     color: colors.primaryDark,
-    fontWeight: "900"
+    fontWeight: "600"
   },
   feedTime: {
     color: colors.textMuted,
@@ -353,19 +387,17 @@ const styles = StyleSheet.create({
   },
   chatButton: {
     alignItems: "center",
-    backgroundColor: colors.primary,
+    backgroundColor: "transparent",
     borderRadius: 999,
-    bottom: 18,
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    bottom: 16,
+    height: 64,
     position: "absolute",
-    right: 16
+    right: 20,
+    width: 64
   },
-  chatText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "900"
+  chatButtonImage: {
+    height: 72,
+    transform: [{ scaleX: -1 }],
+    width: 52
   }
 });
