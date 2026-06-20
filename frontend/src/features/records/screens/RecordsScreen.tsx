@@ -543,15 +543,14 @@ const styles = StyleSheet.create({
   weekRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 18,
-    paddingHorizontal: 2
+    marginTop: 18
   },
   weekText: {
     color: colors.textMuted,
     fontSize: 13,
     fontWeight: "600",
     textAlign: "center",
-    width: "12%"
+    width: "13%"
   },
   dateGrid: {
     flexDirection: "row",
@@ -565,7 +564,7 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     backgroundColor: colors.surfaceSoft,
     borderRadius: 10,
-    width: "12%",
+    width: "13%",
     justifyContent: "center",
     overflow: "hidden"
   },
