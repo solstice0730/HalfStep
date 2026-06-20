@@ -1,114 +1,153 @@
-import { CheckCircle2, ChevronLeft, MessageCircle, Wifi } from "lucide-react-native";
-import { StyleSheet, Text, View } from "react-native";
+import { Camera, Heart, MessageCircle, MoreHorizontal, Plus, Smile, Users } from "lucide-react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Screen } from "@/shared/components/Screen";
 import { colors } from "@/shared/constants/colors";
 
-const rooms = [
-  { emoji: "🏠", title: "엄마 & 아빠방", meta: "현재 활성", active: false, members: ["👩", "👨"] },
-  { emoji: "👵", title: "할머니 돌봄방", meta: "1시간 전", active: true, members: ["👩", "👨", "👵"] }
+const members = [
+  { name: "엄마", initial: "엄", color: colors.peachSoft, active: true },
+  { name: "아빠", initial: "아", color: colors.blueSoft, active: true },
+  { name: "할머니", initial: "할", color: colors.greenSoft, active: false },
+  { name: "이모", initial: "이", color: colors.lavenderSoft, active: true }
 ];
 
-const family = [
-  { emoji: "👩", name: "엄마", status: "온라인", active: true, color: colors.peachSoft },
-  { emoji: "👨", name: "아빠", status: "온라인", active: true, color: colors.blueSoft },
-  { emoji: "👵", name: "할머니", status: "자리비움", active: false, color: colors.greenSoft }
+const posts = [
+  {
+    author: "엄마",
+    time: "방금",
+    title: "리몽이 낮잠 성공",
+    body: "오전 낮잠이 평소보다 길었어요. 수유 후 바로 잠들어서 컨디션도 좋아 보여요.",
+    color: colors.peachSoft,
+    reactions: 5,
+    comments: 2
+  },
+  {
+    author: "아빠",
+    time: "32분 전",
+    title: "기저귀 기록 공유",
+    body: "배변 상태 괜찮았고 양도 평소와 비슷했어요. 다음 수유 때 같이 확인해요.",
+    color: colors.blueSoft,
+    reactions: 3,
+    comments: 1
+  }
 ];
 
-const feeds = [
-  { emoji: "👨", text: "아빠가 배변 기록을 추가했습니다", detail: "늦 대시 보드 경우", time: "10분 전", color: colors.blueSoft },
-  { emoji: "👩", text: "엄마가 새로운 사진을 등록했습니다", detail: "오늘의 성장 일기에 추가됨", time: "32분 전", color: colors.peachSoft },
-  { emoji: "👨", text: "아빠가 수유를 기록했습니다", detail: "120ml · 오른쪽", time: "1시간 15분 전", color: colors.blueSoft },
-  { emoji: "👩", text: "엄마가 수면을 기록했습니다", detail: "낮잠 종료 · 1시간 30분", time: "2시간 전", color: colors.peachSoft }
-];
+function MemberStack() {
+  return (
+    <View style={styles.memberStack}>
+      {members.map((member, index) => (
+        <View
+          key={member.name}
+          style={[
+            styles.stackedAvatar,
+            {
+              backgroundColor: member.color,
+              marginLeft: index === 0 ? 0 : -9,
+              zIndex: members.length - index
+            }
+          ]}
+        >
+          <Text style={styles.stackedInitial}>{member.initial}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 export function FamilyRoomScreen() {
   return (
-    <View style={styles.root}>
+    <SafeAreaView edges={["top"]} style={styles.root}>
       <View style={styles.topNav}>
-        <View style={styles.backButton}>
-          <ChevronLeft color={colors.primaryDark} size={20} />
+        <View style={styles.titleBlock}>
+          <Text style={styles.roomLabel}>가족방</Text>
+          <Text style={styles.navTitle}>리몽이 공동 육아방</Text>
         </View>
-        <Text style={styles.navTitle}>공유방</Text>
-        <View style={styles.placeholder} />
+        <Pressable style={styles.moreButton}>
+          <MoreHorizontal color={colors.primaryDark} size={22} />
+        </Pressable>
       </View>
-      <Screen>
-        <View>
-          <Text style={styles.kicker}>공유 돌봄방</Text>
-          <View style={styles.roomList}>
-            {rooms.map((room) => (
-              <View key={room.title} style={[styles.roomCard, room.active && styles.roomCardActive]}>
-                <View style={styles.roomLeft}>
-                  <View style={[styles.roomIcon, room.active && styles.roomIconActive]}>
-                    <Text style={styles.roomEmoji}>{room.emoji}</Text>
-                  </View>
-                  <View>
-                    <Text style={[styles.roomTitle, room.active && styles.activeText]}>{room.title}</Text>
-                    <View style={styles.roomMetaRow}>
-                      {room.active && <View style={styles.onlineDot} />}
-                      <Text style={[styles.roomMeta, room.active && styles.onlineText]}>{room.meta}</Text>
-                    </View>
-                  </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <View style={styles.roomHero}>
+          <View style={styles.heroTop}>
+            <MemberStack />
+            <View style={styles.memberSummary}>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={styles.memberTitle}>가족 {members.length}명이 함께 보는 방</Text>
+              <Text numberOfLines={2} style={styles.memberText}>기록, 사진 일기, 댓글을 실시간으로 공유해요.</Text>
+            </View>
+          </View>
+
+          <View style={styles.actionRow}>
+            <Pressable style={styles.primaryAction}>
+              <Plus color="#FFFFFF" size={16} />
+              <Text style={styles.primaryActionText}>글쓰기</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryAction}>
+              <Camera color={colors.primary} size={16} />
+              <Text style={styles.secondaryActionText}>사진</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryAction}>
+              <Users color={colors.primary} size={16} />
+              <Text style={styles.secondaryActionText}>초대</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.membersCard}>
+          <Text style={styles.sectionTitle}>가족 프로필</Text>
+          <View style={styles.memberGrid}>
+            {members.map((member) => (
+              <View key={member.name} style={styles.memberItem}>
+                <View style={[styles.memberAvatar, { backgroundColor: member.color }]}>
+                  <Text style={styles.memberInitial}>{member.initial}</Text>
+                  {member.active && <View style={styles.onlineDot} />}
                 </View>
-                <View style={styles.memberStack}>
-                  {room.members.map((member, index) => (
-                    <View key={`${room.title}-${member}-${index}`} style={[styles.stackedAvatar, { marginLeft: index === 0 ? 0 : -8 }]}>
-                      <Text style={styles.stackedEmoji}>{member}</Text>
-                    </View>
-                  ))}
-                  {room.active && <Text style={styles.activeBadge}>활성</Text>}
-                </View>
+                <Text numberOfLines={1} style={styles.memberName}>{member.name}</Text>
               </View>
             ))}
           </View>
         </View>
 
-        <View>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>실시간 공동 육아 피드</Text>
-            <View style={styles.syncBadge}>
-              <Wifi color={colors.success} size={12} />
-              <Text style={styles.syncText}>동기화됨</Text>
-            </View>
-          </View>
-          <View style={styles.familyRow}>
-            {family.map((member) => (
-              <View key={member.name} style={styles.familyMember}>
-                <View style={[styles.familyAvatar, { backgroundColor: member.color }]}>
-                  <Text style={styles.familyEmoji}>{member.emoji}</Text>
-                  {member.active && <View style={styles.statusDot} />}
-                </View>
-                <Text style={styles.familyName}>{member.name}</Text>
-                <Text style={[styles.familyStatus, member.active && styles.onlineText]}>{member.status}</Text>
-              </View>
-            ))}
-          </View>
+        <View style={styles.feedHeader}>
+          <Text style={styles.sectionTitle}>실시간 공동 육아 피드</Text>
         </View>
 
         <View style={styles.feedList}>
-          {feeds.map((feed) => (
-            <View key={`${feed.text}-${feed.time}`} style={styles.feedCard}>
-              <View style={[styles.feedAvatar, { backgroundColor: feed.color }]}>
-                <Text style={styles.feedEmoji}>{feed.emoji}</Text>
+          {posts.map((post) => (
+            <View key={`${post.author}-${post.time}`} style={styles.postCard}>
+              <View style={styles.postHeader}>
+                <View style={[styles.postAvatar, { backgroundColor: post.color }]}>
+                  <Text style={styles.postInitial}>{post.author[0]}</Text>
+                </View>
+                <View style={styles.postMeta}>
+                  <Text style={styles.postAuthor}>{post.author}</Text>
+                  <Text style={styles.postTime}>{post.time}</Text>
+                </View>
+                <MoreHorizontal color={colors.textMuted} size={20} />
               </View>
-              <View style={styles.feedTextBox}>
-                <Text style={styles.feedText}>
-                  <Text style={styles.feedStrong}>{feed.text}</Text> {feed.detail}
-                </Text>
-                <Text style={styles.feedTime}>{feed.time}</Text>
-              </View>
-              <View style={styles.feedAction}>
-                <CheckCircle2 color={colors.primary} size={16} />
+
+              <Text style={styles.postTitle}>{post.title}</Text>
+              <Text style={styles.postBody}>{post.body}</Text>
+
+              <View style={styles.postActions}>
+                <Pressable style={styles.postActionButton}>
+                  <Smile color={colors.accent} size={16} />
+                  <Text style={styles.postActionText}>공감 {post.reactions}</Text>
+                </Pressable>
+                <Pressable style={styles.postActionButton}>
+                  <MessageCircle color={colors.primary} size={16} />
+                  <Text style={styles.postActionText}>댓글 {post.comments}</Text>
+                </Pressable>
+                <Pressable style={styles.postActionButton}>
+                  <Heart color={colors.textMuted} size={16} />
+                  <Text style={styles.postActionText}>저장</Text>
+                </Pressable>
               </View>
             </View>
           ))}
         </View>
-      </Screen>
-      <View style={styles.chatButton}>
-        <MessageCircle color="#FFFFFF" size={18} />
-        <Text style={styles.chatText}>AI 챗봇</Text>
-      </View>
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -122,250 +161,254 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     borderBottomWidth: 1,
     flexDirection: "row",
-    height: 56,
+    height: 62,
     justifyContent: "space-between",
     paddingHorizontal: 16
   },
-  backButton: {
+  content: {
+    gap: 20,
+    paddingBottom: 24,
+    paddingHorizontal: 16,
+    paddingTop: 12
+  },
+  titleBlock: {
+    flex: 1,
+    paddingRight: 12
+  },
+  roomLabel: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  navTitle: {
+    color: colors.primaryDark,
+    fontSize: 18,
+    fontWeight: "900",
+    marginTop: 2
+  },
+  moreButton: {
     alignItems: "center",
     backgroundColor: colors.surfaceSoft,
     borderRadius: 999,
-    height: 36,
+    height: 40,
     justifyContent: "center",
-    width: 36
+    width: 40
   },
-  navTitle: {
+  roomHero: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 14
+  },
+  heroTop: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    minHeight: 52
+  },
+  memberStack: {
+    flexDirection: "row",
+    flexShrink: 0,
+    width: 122
+  },
+  stackedAvatar: {
+    alignItems: "center",
+    borderColor: colors.surface,
+    borderRadius: 999,
+    borderWidth: 3,
+    height: 38,
+    justifyContent: "center",
+    width: 38
+  },
+  stackedInitial: {
+    color: colors.primaryDark,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  memberSummary: {
+    flex: 1,
+    minWidth: 0
+  },
+  memberTitle: {
+    color: colors.primaryDark,
+    fontSize: 16,
+    fontWeight: "900",
+    lineHeight: 21
+  },
+  memberText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 7,
+    marginTop: 15
+  },
+  primaryAction: {
+    alignItems: "center",
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    flex: 1.15,
+    flexDirection: "row",
+    gap: 5,
+    justifyContent: "center",
+    minHeight: 40,
+    paddingHorizontal: 8
+  },
+  primaryActionText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  secondaryAction: {
+    alignItems: "center",
+    backgroundColor: colors.blueSoft,
+    borderRadius: 999,
+    flex: 1,
+    flexDirection: "row",
+    gap: 5,
+    justifyContent: "center",
+    minHeight: 40,
+    paddingHorizontal: 8
+  },
+  secondaryActionText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  membersCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 14
+  },
+  sectionTitle: {
     color: colors.primaryDark,
     fontSize: 17,
     fontWeight: "900"
   },
-  placeholder: {
-    width: 36
-  },
-  kicker: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  roomList: {
-    gap: 12,
-    marginTop: 12
-  },
-  roomCard: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 20,
-    borderWidth: 1,
+  memberGrid: {
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: 16
+    marginTop: 14
   },
-  roomCardActive: {
-    backgroundColor: colors.blueSoft,
-    borderColor: colors.primary,
-    borderWidth: 1.5
-  },
-  roomLeft: {
+  memberItem: {
     alignItems: "center",
-    flexDirection: "row",
-    gap: 12
+    flex: 1,
+    minWidth: 0
   },
-  roomIcon: {
+  memberAvatar: {
     alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
-    borderRadius: 16,
-    height: 44,
+    borderRadius: 999,
+    height: 50,
     justifyContent: "center",
-    width: 44
+    width: 50
   },
-  roomIconActive: {
-    backgroundColor: "#FFFFFF"
-  },
-  roomEmoji: {
-    fontSize: 22
-  },
-  roomTitle: {
+  memberInitial: {
     color: colors.primaryDark,
     fontSize: 15,
     fontWeight: "900"
   },
-  activeText: {
-    color: colors.primary
-  },
-  roomMetaRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 6,
-    marginTop: 4
-  },
-  roomMeta: {
-    color: colors.textMuted,
-    fontSize: 12
-  },
   onlineDot: {
     backgroundColor: colors.success,
-    borderRadius: 999,
-    height: 6,
-    width: 6
-  },
-  onlineText: {
-    color: colors.success
-  },
-  memberStack: {
-    alignItems: "center",
-    flexDirection: "row"
-  },
-  stackedAvatar: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.background,
+    borderColor: colors.surface,
     borderRadius: 999,
     borderWidth: 2,
-    height: 28,
-    justifyContent: "center",
-    width: 28
-  },
-  stackedEmoji: {
-    fontSize: 14
-  },
-  activeBadge: {
-    backgroundColor: colors.primary,
-    borderRadius: 999,
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "900",
-    marginLeft: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6
-  },
-  sectionHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
-  sectionTitle: {
-    color: colors.primaryDark,
-    fontSize: 18,
-    fontWeight: "900"
-  },
-  syncBadge: {
-    alignItems: "center",
-    backgroundColor: colors.greenSoft,
-    borderRadius: 999,
-    flexDirection: "row",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5
-  },
-  syncText: {
-    color: colors.success,
-    fontSize: 11,
-    fontWeight: "900"
-  },
-  familyRow: {
-    flexDirection: "row",
-    gap: 18,
-    marginTop: 16
-  },
-  familyMember: {
-    alignItems: "center"
-  },
-  familyAvatar: {
-    alignItems: "center",
-    borderRadius: 999,
-    height: 56,
-    justifyContent: "center",
-    width: 56
-  },
-  familyEmoji: {
-    fontSize: 28
-  },
-  statusDot: {
-    backgroundColor: colors.success,
-    borderColor: colors.background,
-    borderRadius: 999,
-    borderWidth: 2,
-    bottom: 0,
+    bottom: 1,
     height: 12,
     position: "absolute",
     right: 2,
     width: 12
   },
-  familyName: {
+  memberName: {
     color: colors.primaryDark,
     fontSize: 12,
     fontWeight: "800",
-    marginTop: 6
+    marginTop: 6,
+    maxWidth: 62
   },
-  familyStatus: {
-    color: colors.textMuted,
-    fontSize: 10,
-    marginTop: 3
+  feedHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
   },
   feedList: {
     gap: 12
   },
-  feedCard: {
-    alignItems: "center",
+  postCard: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    padding: 16
+    padding: 15
   },
-  feedAvatar: {
+  postHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10
+  },
+  postAvatar: {
     alignItems: "center",
     borderRadius: 999,
-    height: 44,
+    height: 42,
     justifyContent: "center",
-    width: 44
+    width: 42
   },
-  feedEmoji: {
-    fontSize: 22
+  postInitial: {
+    color: colors.primaryDark,
+    fontSize: 14,
+    fontWeight: "900"
   },
-  feedTextBox: {
-    flex: 1
+  postMeta: {
+    flex: 1,
+    minWidth: 0
   },
-  feedText: {
+  postAuthor: {
+    color: colors.primaryDark,
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  postTime: {
+    color: colors.textMuted,
+    fontSize: 11,
+    marginTop: 2
+  },
+  postTitle: {
+    color: colors.primaryDark,
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 14
+  },
+  postBody: {
     color: colors.textMuted,
     fontSize: 14,
-    lineHeight: 21
+    lineHeight: 22,
+    marginTop: 8
   },
-  feedStrong: {
-    color: colors.primaryDark,
-    fontWeight: "900"
-  },
-  feedTime: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 4
-  },
-  feedAction: {
-    alignItems: "center",
-    backgroundColor: colors.blueSoft,
-    borderRadius: 999,
-    height: 32,
-    justifyContent: "center",
-    width: 32
-  },
-  chatButton: {
-    alignItems: "center",
-    backgroundColor: colors.primary,
-    borderRadius: 999,
-    bottom: 18,
+  postActions: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
     flexDirection: "row",
     gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    position: "absolute",
-    right: 16
+    marginTop: 14,
+    paddingTop: 12
   },
-  chatText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "900"
+  postActionButton: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 5,
+    justifyContent: "center",
+    minWidth: 0
+  },
+  postActionText: {
+    color: colors.textMuted,
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: "800"
   }
 });

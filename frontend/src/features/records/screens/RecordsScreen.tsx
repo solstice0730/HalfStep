@@ -1,4 +1,5 @@
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import * as ImagePicker from "expo-image-picker";
 import { Camera, ChevronLeft, ImagePlus, PenLine, Save, X } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -6,12 +7,17 @@ import {
   Dimensions,
   Image,
   ImageBackground,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -26,6 +32,11 @@ type Story = {
   text: string;
   image: string;
   summary: string[];
+  imagePosition?: {
+    x: number;
+    y: number;
+    scale: number;
+  };
 };
 
 const calendarDays = Array.from({ length: 30 }, (_, index) => index + 1);
@@ -57,16 +68,42 @@ const initialStories: Record<number, Story> = {
 };
 
 function StorySlide({ date, story }: { date: number; story: Story }) {
+  const position = story.imagePosition ?? { x: 0, y: 0, scale: 1 };
+
   return (
     <View style={styles.storySlide}>
-      <View style={styles.storyPhotoFrame}>
-        <Image source={{ uri: story.image }} resizeMode="contain" style={styles.storyPhoto} />
-      </View>
-      <View style={styles.fullStoryText}>
-        <Text style={styles.fullStoryDate}>6월 {date}일</Text>
-        <Text style={styles.fullStoryTitle}>{story.title}</Text>
-        <Text style={styles.fullStoryBody}>{story.text}</Text>
-      </View>
+      <Image source={{ uri: story.image }} resizeMode="cover" blurRadius={12} style={styles.storyBlurBackground} />
+      <ImageBackground
+        fadeDuration={0}
+        source={{ uri: story.image }}
+        resizeMode="cover"
+        style={styles.storyPhotoBackground}
+        imageStyle={[
+          styles.storyPhotoImage,
+          {
+            transform: [
+              { translateX: position.x },
+              { translateY: position.y },
+              { scale: position.scale }
+            ]
+          }
+        ]}
+      >
+        <View style={styles.storyTopMeta}>
+          <Text style={styles.storyDatePillText}>6월 {date}일</Text>
+        </View>
+        <View style={styles.storyTextScrim}>
+          <ScrollView
+            bounces={false}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+            style={styles.storyTextScroll}
+          >
+            <Text style={styles.fullStoryTitle}>{story.title}</Text>
+            <Text style={styles.fullStoryBody}>{story.text}</Text>
+          </ScrollView>
+        </View>
+      </ImageBackground>
     </View>
   );
 }
@@ -79,11 +116,13 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
   const [draftTitle, setDraftTitle] = useState("");
   const [draftText, setDraftText] = useState("");
   const [draftImageUri, setDraftImageUri] = useState<string | undefined>();
+  const [draftImagePosition, setDraftImagePosition] = useState({ x: 0, y: 0, scale: 1 });
 
   const processedCameraUri = useRef<string | undefined>(undefined);
   const progress = useRef(new Animated.Value(0)).current;
   const storyTranslateX = useRef(new Animated.Value(0)).current;
   const storyDragY = useRef(new Animated.Value(0)).current;
+  const editorTranslateX = useRef(new Animated.Value(0)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   const touchStartedAt = useRef(0);
   const gestureMoved = useRef(false);
@@ -171,6 +210,10 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
   const goToStory = (direction: "prev" | "next") => {
     const targetDate = direction === "prev" ? prevDate : nextDate;
     if (!targetDate || storyMovingRef.current) {
+      if (direction === "prev" && !targetDate) {
+        closeStory();
+        return;
+      }
       Animated.spring(storyTranslateX, {
         toValue: -currentIndex * screenWidth,
         useNativeDriver: true,
@@ -208,9 +251,38 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
 
   const openEditor = (imageUri?: string) => {
     setDraftImageUri(imageUri);
+    setDraftImagePosition({ x: 0, y: 0, scale: 1 });
     setDraftTitle("");
     setDraftText("");
+    editorTranslateX.setValue(0);
     setEditorOpen(true);
+  };
+
+  const closeEditorWithSwipe = () => {
+    Keyboard.dismiss();
+    Animated.timing(editorTranslateX, {
+      duration: 180,
+      toValue: screenWidth,
+      useNativeDriver: true
+    }).start(() => {
+      setEditorOpen(false);
+      editorTranslateX.setValue(0);
+    });
+  };
+
+  const pickPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.9
+    });
+
+    if (!result.canceled) {
+      setDraftImageUri(result.assets[0]?.uri);
+      setDraftImagePosition({ x: 0, y: 0, scale: 1 });
+    }
   };
 
   const saveDiary = () => {
@@ -224,6 +296,7 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
         title,
         text,
         image,
+        imagePosition: draftImagePosition,
         summary: ["일기", "사진", "오늘"]
       }
     }));
@@ -231,7 +304,43 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
     setDraftTitle("");
     setDraftText("");
     setDraftImageUri(undefined);
+    setDraftImagePosition({ x: 0, y: 0, scale: 1 });
   };
+
+  const editorBackPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) => gesture.dx > 8 && Math.abs(gesture.dy) < 36,
+        onPanResponderMove: (_, gesture) => {
+          if (gesture.dx > 0) {
+            editorTranslateX.setValue(gesture.dx);
+          }
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dx > 86 && Math.abs(gesture.dy) < 48) {
+            closeEditorWithSwipe();
+            return;
+          }
+
+          Animated.spring(editorTranslateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            friction: 9,
+            tension: 80
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(editorTranslateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            friction: 9,
+            tension: 80
+          }).start();
+        }
+      }),
+    []
+  );
+
 
   const storyPanResponder = useMemo(
     () =>
@@ -325,128 +434,168 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
 
   return (
     <View style={styles.root}>
-      {editorOpen ? (
-        <SafeAreaView style={styles.fixedArea}>
-          <View style={styles.editorHeader}>
-            <Pressable hitSlop={12} style={styles.iconButton} onPress={() => setEditorOpen(false)}>
-              <ChevronLeft color={colors.primaryDark} size={21} />
-            </Pressable>
-            <Text style={styles.navTitle}>일기 쓰기</Text>
-            <Pressable hitSlop={12} style={styles.saveButton} onPress={saveDiary}>
-              <Save color="#FFFFFF" size={17} />
-              <Text style={styles.saveButtonText}>저장</Text>
-            </Pressable>
-          </View>
+      <SafeAreaView style={styles.fixedArea}>
+        <View style={styles.topNav}>
+          <View style={styles.navSpacer} />
+          <Text style={styles.navTitle}>기록</Text>
+          <Pressable hitSlop={12} style={styles.diaryButton} onPress={() => openEditor()}>
+            <PenLine color="#FFFFFF" size={16} />
+            <Text style={styles.diaryButtonText}>일기</Text>
+          </Pressable>
+        </View>
 
-          <View style={styles.editorBody}>
-            <Pressable style={styles.photoPicker} onPress={() => setDraftImageUri(samplePhoto)}>
-              {draftImageUri ? (
-                <Image source={{ uri: draftImageUri }} resizeMode="cover" style={styles.draftPhoto} />
-              ) : (
-                <View style={styles.photoEmpty}>
-                  <ImagePlus color={colors.primary} size={34} />
-                  <Text style={styles.photoEmptyText}>사진 추가하기</Text>
-                </View>
-              )}
-            </Pressable>
-            <TextInput
-              value={draftTitle}
-              onChangeText={setDraftTitle}
-              placeholder="일기 제목"
-              placeholderTextColor={colors.textMuted}
-              style={styles.titleInput}
-            />
-            <TextInput
-              value={draftText}
-              onChangeText={setDraftText}
-              multiline
-              placeholder="오늘의 순간을 적어보세요."
-              placeholderTextColor={colors.textMuted}
-              style={styles.bodyInput}
-              textAlignVertical="top"
-            />
-          </View>
-        </SafeAreaView>
-      ) : (
-        <SafeAreaView style={styles.fixedArea}>
-          <View style={styles.topNav}>
-            <View style={styles.iconButton}>
-              <ChevronLeft color={colors.primaryDark} size={20} />
+        <View style={styles.fixedContent}>
+          <View style={styles.calendarCard}>
+            <View style={styles.calendarHeader}>
+              <Text style={styles.monthTitle}>2026년 6월</Text>
+              <View style={styles.photoBadge}>
+                <Camera color={colors.primary} size={14} />
+                <Text style={styles.photoBadgeText}>사진 일기</Text>
+              </View>
             </View>
-            <Text style={styles.navTitle}>기록</Text>
-            <Pressable hitSlop={12} style={styles.diaryButton} onPress={() => openEditor()}>
-              <PenLine color="#FFFFFF" size={16} />
-              <Text style={styles.diaryButtonText}>일기</Text>
-            </Pressable>
+
+            <View style={styles.weekRow}>
+              {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
+                <Text key={day} style={styles.weekText}>{day}</Text>
+              ))}
+            </View>
+
+            <View style={styles.dateGrid}>
+              {calendarDays.map((date) => {
+                const story = stories[date];
+                const selected = selectedDate === date;
+
+                return (
+                  <Pressable
+                    key={date}
+                    style={[styles.dateCell, selected && styles.dateCellActive]}
+                    onPress={() => {
+                      setSelectedDate(date);
+                      if (story) openStory(date);
+                    }}
+                  >
+                    {story ? (
+                      <ImageBackground
+                        fadeDuration={0}
+                        source={{ uri: story.image }}
+                        imageStyle={styles.dateThumbnailImage}
+                        style={styles.dateThumbnail}
+                      >
+                        <View style={[styles.dateOverlay, selected && styles.dateOverlayActive]}>
+                          <Text style={styles.thumbnailDateText}>{date}</Text>
+                        </View>
+                      </ImageBackground>
+                    ) : (
+                      <Text style={[styles.dateText, selected && styles.dateTextActive]}>{date}</Text>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
 
-          <View style={styles.fixedContent}>
-            <View style={styles.calendarCard}>
-              <View style={styles.calendarHeader}>
-                <Text style={styles.monthTitle}>2026년 6월</Text>
-                <View style={styles.photoBadge}>
-                  <Camera color={colors.primary} size={14} />
-                  <Text style={styles.photoBadgeText}>사진 일기</Text>
+          <Pressable style={styles.previewCard} onPress={() => selectedStory ? openStory(selectedDate) : openEditor()}>
+            {selectedStory ? (
+              <ImageBackground source={{ uri: selectedStory.image }} imageStyle={styles.previewImage} style={styles.previewImageBox}>
+                <View style={styles.previewOverlay}>
+                  <Text style={styles.previewDate}>6월 {selectedDate}일</Text>
+                  <Text style={styles.previewTitle}>{selectedStory.title}</Text>
                 </View>
+              </ImageBackground>
+            ) : (
+              <View style={styles.emptyStory}>
+                <ImagePlus color={colors.primary} size={34} />
+                <Text style={styles.emptyTitle}>이 날짜에 일기를 남겨보세요</Text>
+                <Text style={styles.emptyText}>사진을 추가하면 캘린더 썸네일과 스토리 화면에 자동으로 보여요.</Text>
               </View>
+            )}
+          </Pressable>
+        </View>
+      </SafeAreaView>
 
-              <View style={styles.weekRow}>
-                {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
-                  <Text key={day} style={styles.weekText}>{day}</Text>
-                ))}
-              </View>
+      {editorOpen && (
+        <SafeAreaView style={[styles.fixedArea, styles.editorOverlay]} {...editorBackPanResponder.panHandlers}>
+          <Animated.View
+            style={[
+              styles.editorAnimatedPage,
+              {
+                transform: [{ translateX: editorTranslateX }]
+              }
+            ]}
+          >
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              style={styles.keyboardArea}
+            >
+              <TouchableWithoutFeedback accessible={false} onPress={Keyboard.dismiss}>
+                <View style={styles.keyboardArea}>
+                  <View style={styles.editorHeader}>
+                    <Pressable hitSlop={12} style={styles.iconButton} onPress={closeEditorWithSwipe}>
+                      <ChevronLeft color={colors.primaryDark} size={21} />
+                    </Pressable>
+                    <Text style={styles.navTitle}>일기 쓰기</Text>
+                    <Pressable hitSlop={12} style={styles.saveButton} onPress={() => {
+                      Keyboard.dismiss();
+                      saveDiary();
+                    }}>
+                      <Save color="#FFFFFF" size={17} />
+                      <Text style={styles.saveButtonText}>저장</Text>
+                    </Pressable>
+                  </View>
 
-              <View style={styles.dateGrid}>
-                {calendarDays.map((date) => {
-                  const story = stories[date];
-                  const selected = selectedDate === date;
-
-                  return (
-                    <Pressable
-                      key={date}
-                      style={[styles.dateCell, selected && styles.dateCellActive]}
-                      onPress={() => {
-                        setSelectedDate(date);
-                        if (story) openStory(date);
-                      }}
-                    >
-                      {story ? (
-                        <ImageBackground
-                          fadeDuration={0}
-                          source={{ uri: story.image }}
-                          imageStyle={styles.dateThumbnailImage}
-                          style={styles.dateThumbnail}
-                        >
-                          <View style={[styles.dateOverlay, selected && styles.dateOverlayActive]}>
-                            <Text style={styles.thumbnailDateText}>{date}</Text>
-                          </View>
-                        </ImageBackground>
+                  <View style={styles.editorBody}>
+                    <Pressable style={styles.photoPicker} onPress={pickPhoto}>
+                      {draftImageUri ? (
+                        <Image
+                          source={{ uri: draftImageUri }}
+                          resizeMode="cover"
+                          style={[
+                            styles.draftPhoto,
+                            {
+                              transform: [
+                                { translateX: draftImagePosition.x },
+                                { translateY: draftImagePosition.y },
+                                { scale: draftImagePosition.scale }
+                              ]
+                            }
+                          ]}
+                        />
                       ) : (
-                        <Text style={[styles.dateText, selected && styles.dateTextActive]}>{date}</Text>
+                        <View style={styles.photoEmpty}>
+                          <ImagePlus color={colors.primary} size={34} />
+                          <Text style={styles.photoEmptyText}>사진 추가하기</Text>
+                          <Text style={styles.photoEmptySubText}>내 갤러리에서 사진을 선택해요</Text>
+                        </View>
                       )}
                     </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            <Pressable style={styles.previewCard} onPress={() => selectedStory ? openStory(selectedDate) : openEditor()}>
-              {selectedStory ? (
-                <ImageBackground source={{ uri: selectedStory.image }} imageStyle={styles.previewImage} style={styles.previewImageBox}>
-                  <View style={styles.previewOverlay}>
-                    <Text style={styles.previewDate}>6월 {selectedDate}일</Text>
-                    <Text style={styles.previewTitle}>{selectedStory.title}</Text>
+                    <TextInput
+                      value={draftTitle}
+                      onBlur={Keyboard.dismiss}
+                      onChangeText={setDraftTitle}
+                      onSubmitEditing={Keyboard.dismiss}
+                      placeholder="일기 제목"
+                      placeholderTextColor={colors.textMuted}
+                      returnKeyType="done"
+                      style={styles.titleInput}
+                    />
+                    <TextInput
+                      value={draftText}
+                      blurOnSubmit
+                      multiline
+                      onBlur={Keyboard.dismiss}
+                      onChangeText={setDraftText}
+                      onSubmitEditing={Keyboard.dismiss}
+                      placeholder="오늘의 순간을 적어보세요."
+                      placeholderTextColor={colors.textMuted}
+                      returnKeyType="done"
+                      style={styles.bodyInput}
+                      textAlignVertical="top"
+                    />
                   </View>
-                </ImageBackground>
-              ) : (
-                <View style={styles.emptyStory}>
-                  <ImagePlus color={colors.primary} size={34} />
-                  <Text style={styles.emptyTitle}>이 날짜에 일기를 남겨보세요</Text>
-                  <Text style={styles.emptyText}>사진을 추가하면 캘린더 썸네일과 스토리 화면에 자동으로 보여요.</Text>
                 </View>
-              )}
-            </Pressable>
-          </View>
+              </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
+          </Animated.View>
         </SafeAreaView>
       )}
 
@@ -480,12 +629,13 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
                 <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
               </View>
               <Pressable hitSlop={12} style={styles.closeStory} onPress={closeStory}>
-                <X color="#FFFFFF" size={24} />
+                <X color={colors.primaryDark} size={24} />
               </Pressable>
             </View>
           </Animated.View>
         </View>
       </Modal>
+
     </View>
   );
 }
@@ -496,6 +646,20 @@ const styles = StyleSheet.create({
     flex: 1
   },
   fixedArea: {
+    backgroundColor: colors.background,
+    flex: 1
+  },
+  editorOverlay: {
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  keyboardArea: {
+    flex: 1
+  },
+  editorAnimatedPage: {
     backgroundColor: colors.background,
     flex: 1
   },
@@ -514,6 +678,9 @@ const styles = StyleSheet.create({
     height: 56,
     justifyContent: "space-between",
     paddingHorizontal: 16
+  },
+  navSpacer: {
+    width: 76
   },
   editorHeader: {
     alignItems: "center",
@@ -737,6 +904,12 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 10
   },
+  photoEmptySubText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 4
+  },
   titleInput: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -780,59 +953,89 @@ const styles = StyleSheet.create({
     zIndex: 3
   },
   progressTrack: {
-    backgroundColor: "rgba(255,255,255,0.34)",
+    backgroundColor: "rgba(95,142,168,0.18)",
     borderRadius: 999,
     height: 4,
     overflow: "hidden"
   },
   progressFill: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.primary,
     height: "100%"
   },
   closeStory: {
     alignItems: "center",
     alignSelf: "flex-end",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
     height: 44,
     justifyContent: "center",
     marginTop: 12,
     width: 44
   },
   storySlide: {
+    backgroundColor: "#111827",
     flex: 1,
     justifyContent: "center",
-    paddingBottom: 44,
-    paddingHorizontal: 16,
-    paddingTop: 86,
+    overflow: "hidden",
     width: screenWidth
   },
-  storyPhotoFrame: {
-    alignItems: "center",
+  storyBlurBackground: {
+    bottom: 0,
+    left: 0,
+    opacity: 0.42,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  storyPhotoBackground: {
     flex: 1,
-    justifyContent: "center"
+    justifyContent: "flex-end",
+    paddingBottom: 30,
+    paddingHorizontal: 16,
+    paddingTop: 98
   },
-  storyPhoto: {
-    borderRadius: 24,
-    height: "100%",
-    width: "100%"
+  storyPhotoImage: {
+    opacity: 0.96
   },
-  fullStoryText: {
-    gap: 6,
-    paddingBottom: 20,
-    paddingTop: 18
+  storyTopMeta: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,247,236,0.9)",
+    borderRadius: 999,
+    marginBottom: "auto",
+    paddingHorizontal: 12,
+    paddingVertical: 7
   },
-  fullStoryDate: {
-    color: "rgba(255,255,255,0.78)",
-    fontSize: 13,
+  storyDatePillText: {
+    color: colors.primary,
+    fontSize: 12,
     fontWeight: "900"
+  },
+  storyTextScrim: {
+    backgroundColor: "rgba(255,247,236,0.86)",
+    borderColor: "rgba(255,255,255,0.72)",
+    borderRadius: 26,
+    borderWidth: 1,
+    maxHeight: "48%",
+    minHeight: 156,
+    paddingHorizontal: 18,
+    paddingVertical: 16
+  },
+  storyTextScroll: {
+    flexGrow: 0
   },
   fullStoryTitle: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "900"
+    color: colors.primaryDark,
+    fontSize: 22,
+    fontWeight: "900",
+    lineHeight: 29
   },
   fullStoryBody: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    lineHeight: 22
+    color: colors.primaryDark,
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 22,
+    marginTop: 8
   }
 });

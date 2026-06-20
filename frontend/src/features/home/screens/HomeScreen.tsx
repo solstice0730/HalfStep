@@ -6,13 +6,12 @@ import {
   Flashlight,
   MessageCircle,
   PenLine,
-  RotateCcw,
   Send,
   Sparkles,
   X,
   Zap
 } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -20,13 +19,20 @@ import {
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  PanGestureHandler,
+  State,
+  type PanGestureHandlerGestureEvent,
+  type PanGestureHandlerStateChangeEvent
+} from "react-native-gesture-handler";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { colors } from "@/shared/constants/colors";
@@ -88,7 +94,7 @@ function BabyMascot() {
       <Text style={styles.decorHeart}>♥</Text>
       <Animated.View style={[styles.mascotShadow, { transform: [{ scaleX: shadowScale }] }]} />
       <Animated.Image
-        source={require("../../../../assets/images/baby-character.png")}
+        source={require("../../../../assets/images/baby-character-nobackground.png")}
         resizeMode="contain"
         style={[styles.mascotImage, { transform: [{ translateY }, { rotate }] }]}
       />
@@ -97,26 +103,45 @@ function BabyMascot() {
 }
 
 export function HomeScreen({ navigation }: HomeScreenProps) {
+  const insets = useSafeAreaInsets();
   const pagerRef = useRef<ScrollView>(null);
   const cameraRef = useRef<CameraView>(null);
+  const cameraTranslateX = useRef(new Animated.Value(-screenWidth)).current;
   const [permission, requestPermission] = useCameraPermissions();
   const [quickOpen, setQuickOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [facing, setFacing] = useState<"front" | "back">("back");
   const [flashOn, setFlashOn] = useState(false);
   const [lastShot, setLastShot] = useState<string | null>(null);
 
   const openCamera = () => {
-    pagerRef.current?.scrollTo({ x: 0, animated: true });
+    setCameraOpen(true);
+    cameraTranslateX.setValue(-screenWidth);
+    requestAnimationFrame(() => {
+      Animated.timing(cameraTranslateX, {
+        duration: 220,
+        toValue: 0,
+        useNativeDriver: true
+      }).start();
+    });
   };
 
   const closeCamera = () => {
-    pagerRef.current?.scrollTo({ x: screenWidth, animated: true });
+    Animated.timing(cameraTranslateX, {
+      duration: 190,
+      toValue: -screenWidth,
+      useNativeDriver: true
+    }).start(() => {
+      setLastShot(null);
+      setCameraOpen(false);
+    });
   };
 
   const handleMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    setCurrentPage(Math.round(event.nativeEvent.contentOffset.x / screenWidth));
+    const nextPage = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
+    setCurrentPage(nextPage);
   };
 
   const takePhoto = async () => {
@@ -134,8 +159,122 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     closeCamera();
   };
 
+  const homeSwipeResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) => gesture.dx > 12 && Math.abs(gesture.dy) < 28,
+        onPanResponderGrant: () => {
+          cameraTranslateX.setValue(-screenWidth);
+          setCameraOpen(true);
+        },
+        onPanResponderMove: (_, gesture) => {
+          if (gesture.dx > 0) {
+            cameraTranslateX.setValue(Math.min(0, -screenWidth + gesture.dx));
+          }
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dx > screenWidth * 0.28 && Math.abs(gesture.dy) < 56) {
+            Animated.timing(cameraTranslateX, {
+              duration: 150,
+              toValue: 0,
+              useNativeDriver: true
+            }).start();
+            return;
+          }
+
+          Animated.timing(cameraTranslateX, {
+            duration: 160,
+            toValue: -screenWidth,
+            useNativeDriver: true
+          }).start(() => setCameraOpen(false));
+        },
+        onPanResponderTerminate: () => {
+          Animated.timing(cameraTranslateX, {
+            duration: 160,
+            toValue: -screenWidth,
+            useNativeDriver: true
+          }).start(() => setCameraOpen(false));
+        }
+      }),
+    [cameraTranslateX]
+  );
+
+  const handleCameraGesture = (event: PanGestureHandlerGestureEvent) => {
+    const { translationX } = event.nativeEvent;
+    if (translationX < 0) {
+      cameraTranslateX.setValue(Math.max(-screenWidth, translationX));
+    }
+  };
+
+  const handleCameraGestureState = (event: PanGestureHandlerStateChangeEvent) => {
+    const { oldState, translationX, velocityX } = event.nativeEvent;
+    if (oldState !== State.ACTIVE) return;
+
+    if (translationX < -screenWidth * 0.16 || velocityX < -650) {
+      closeCamera();
+      return;
+    }
+
+    Animated.spring(cameraTranslateX, {
+      toValue: 0,
+      useNativeDriver: true,
+      friction: 9,
+      tension: 80
+    }).start();
+  };
+
+  const renderHomeContent = (handlers?: ReturnType<typeof PanResponder.create>["panHandlers"]) => (
+    <View style={styles.page}>
+      <View style={styles.homeRoot} {...handlers}>
+        <View style={styles.header}>
+          <Pressable style={styles.statusPill}>
+            <Text style={styles.statusText}>함께 자라는 중</Text>
+            <ChevronDown color={colors.textMuted} size={18} />
+          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.quickButton} onPress={() => setQuickOpen(true)}>
+              <PenLine color="#FFFFFF" size={18} />
+            </Pressable>
+            <Pressable style={styles.cameraButton} onPress={openCamera}>
+              <Camera color={colors.primaryDark} size={18} />
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.mascotPanel}>
+          <BabyMascot />
+        </View>
+
+        <View style={styles.dayBlock}>
+          <Text style={styles.babyName}>리몽이와 만난 지</Text>
+          <Text style={styles.dayText}>{babyDay}일째</Text>
+        </View>
+
+        <Pressable style={styles.questionBox} onPress={() => setChatOpen(true)}>
+          <Text style={styles.questionText}>아기가 전해줬으면 하는 말이 있나요?</Text>
+          <View style={styles.sendButton}>
+            <Send color="#FFFFFF" size={18} />
+          </View>
+        </Pressable>
+
+        <View style={styles.curationCard}>
+          <View style={styles.curationHeader}>
+            <Text style={styles.curationTitle}>{curation.title}</Text>
+            <Sparkles color={colors.accent} size={18} />
+          </View>
+          <Text style={styles.curationText}>{curation.text}</Text>
+          <View style={styles.chipRow}>
+            {curation.chips.map((chip) => (
+              <Text key={chip} style={styles.chip}>#{chip}</Text>
+            ))}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
       <ScrollView
         ref={pagerRef}
         horizontal
@@ -143,30 +282,41 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         bounces={false}
         contentOffset={{ x: screenWidth, y: 0 }}
         showsHorizontalScrollIndicator={false}
+        scrollEnabled={false}
         scrollEventThrottle={16}
         onMomentumScrollEnd={handleMomentumEnd}
         style={styles.pager}
       >
-        <View style={styles.page}>
-          <View style={styles.cameraRoot}>
-            <View style={styles.cameraTopOverlay}>
+        <View style={styles.page} />
+
+        {renderHomeContent(homeSwipeResponder.panHandlers)}
+      </ScrollView>
+
+      <Modal visible={cameraOpen} animationType="none" presentationStyle="fullScreen" transparent onRequestClose={closeCamera}>
+        <PanGestureHandler
+          activeOffsetX={[-8, 8]}
+          failOffsetY={[-42, 42]}
+          onGestureEvent={handleCameraGesture}
+          onHandlerStateChange={handleCameraGestureState}
+        >
+          <Animated.View
+            style={[styles.cameraRoot, { transform: [{ translateX: cameraTranslateX }] }]}
+          >
+            <View style={[styles.cameraTopOverlay, { paddingTop: insets.top + 12 }]}>
               <Pressable style={styles.cameraControl} onPress={closeCamera}>
                 <X color="#FFFFFF" size={25} />
               </Pressable>
               <Text style={styles.cameraTitle}>오늘 사진 기록</Text>
-              <View style={styles.cameraTopActions}>
-                <Pressable style={styles.cameraControl} onPress={() => setFlashOn((value) => !value)}>
-                  {flashOn ? <Zap color="#F5C842" size={22} /> : <Flashlight color="#FFFFFF" size={21} />}
-                </Pressable>
-                <Pressable style={styles.cameraControl} onPress={() => setFacing((value) => (value === "back" ? "front" : "back"))}>
-                  <RotateCcw color="#FFFFFF" size={22} />
-                </Pressable>
-              </View>
+              <View style={styles.cameraHeaderSpacer} />
             </View>
 
             <View style={styles.cameraStage}>
               {permission?.granted ? (
-                <CameraView ref={cameraRef} style={styles.cameraView} facing={facing} />
+                lastShot ? (
+                  <Image source={{ uri: lastShot }} resizeMode="cover" style={styles.cameraView} />
+                ) : (
+                  <CameraView ref={cameraRef} style={styles.cameraView} facing={facing} />
+                )
               ) : (
                 <View style={styles.permissionBox}>
                   <Camera color="#FFFFFF" size={52} />
@@ -177,13 +327,24 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                   </Pressable>
                 </View>
               )}
-            </View>
-
-            <View style={styles.cameraBottom}>
-              {lastShot ? (
+              {!lastShot && permission?.granted && (
+                <>
+                  <View style={styles.cameraBottomDock}>
+                    <Pressable style={styles.flashButton} onPress={() => setFlashOn((value) => !value)}>
+                      {flashOn ? <Zap color="#F5C842" size={22} /> : <Flashlight color="#FFFFFF" size={21} />}
+                    </Pressable>
+                    <Pressable style={styles.shutterButton} onPress={takePhoto}>
+                      <View style={styles.shutterInner} />
+                    </Pressable>
+                    <Pressable style={styles.flipButton} onPress={() => setFacing((value) => (value === "back" ? "front" : "back"))}>
+                      <Camera color="#FFFFFF" size={23} />
+                    </Pressable>
+                  </View>
+                </>
+              )}
+              {lastShot && (
                 <View style={styles.recordPrompt}>
-                  <Image source={{ uri: lastShot }} style={styles.shotPreview} />
-                  <Text style={styles.recordPromptTitle}>방금 찍은 사진으로 일기를 쓸까요?</Text>
+                  <Text style={styles.recordPromptTitle}>이 사진을 일기에 올릴까요?</Text>
                   <Text style={styles.recordPromptText}>일기 작성 화면에 사진이 자동으로 추가돼요.</Text>
                   <View style={styles.recordPromptActions}>
                     <Pressable style={styles.retakeButton} onPress={() => setLastShot(null)}>
@@ -194,66 +355,11 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                     </Pressable>
                   </View>
                 </View>
-              ) : (
-                <View style={styles.capturePanel}>
-                  <Pressable style={styles.shutterButton} onPress={takePhoto}>
-                    <View style={styles.shutterInner} />
-                  </Pressable>
-                </View>
               )}
             </View>
-          </View>
-        </View>
-
-        <View style={styles.page}>
-          <View style={styles.homeRoot}>
-            <View style={styles.header}>
-              <Pressable style={styles.statusPill}>
-                <Text style={styles.statusText}>함께 자라는 중</Text>
-                <ChevronDown color={colors.textMuted} size={18} />
-              </Pressable>
-              <View style={styles.headerActions}>
-                <Pressable style={styles.quickButton} onPress={() => setQuickOpen(true)}>
-                  <PenLine color="#FFFFFF" size={18} />
-                </Pressable>
-                <Pressable style={styles.cameraButton} onPress={openCamera}>
-                  <Camera color={colors.primaryDark} size={18} />
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.mascotPanel}>
-              <BabyMascot />
-            </View>
-
-            <View style={styles.dayBlock}>
-              <Text style={styles.babyName}>리몽이와 만난 지</Text>
-              <Text style={styles.dayText}>{babyDay}일째</Text>
-            </View>
-
-            <Pressable style={styles.questionBox} onPress={() => setChatOpen(true)}>
-              <Text style={styles.questionText}>아기가 전해줬으면 하는 말이 있나요?</Text>
-              <View style={styles.sendButton}>
-                <Send color="#FFFFFF" size={18} />
-              </View>
-            </Pressable>
-
-            <View style={styles.curationCard}>
-              <View style={styles.curationHeader}>
-                <Text style={styles.curationTitle}>{curation.title}</Text>
-                <Sparkles color={colors.accent} size={18} />
-              </View>
-              <Text style={styles.curationText}>{curation.text}</Text>
-              <View style={styles.chipRow}>
-                {curation.chips.map((chip) => (
-                  <Text key={chip} style={styles.chip}>#{chip}</Text>
-                ))}
-              </View>
-            </View>
-
-          </View>
-        </View>
-      </ScrollView>
+          </Animated.View>
+        </PanGestureHandler>
+      </Modal>
 
       {currentPage === 1 && (
         <View style={styles.pageDots}>
@@ -673,17 +779,19 @@ const styles = StyleSheet.create({
   },
   cameraRoot: {
     backgroundColor: colors.background,
-    flex: 1
+    flex: 1,
+    paddingBottom: 16,
+    paddingHorizontal: 12,
+    paddingTop: 10
   },
   cameraTopOverlay: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    left: 0,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    left: 12,
+    paddingHorizontal: 14,
     position: "absolute",
-    right: 0,
+    right: 12,
     top: 0,
     zIndex: 10
   },
@@ -692,9 +800,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "900"
   },
-  cameraTopActions: {
-    flexDirection: "row",
-    gap: 10
+  cameraHeaderSpacer: {
+    width: 42
   },
   cameraControl: {
     alignItems: "center",
@@ -706,11 +813,11 @@ const styles = StyleSheet.create({
   },
   cameraStage: {
     backgroundColor: "#111111",
-    borderRadius: 30,
+    borderRadius: 34,
     flex: 1,
-    margin: 14,
-    marginTop: 66,
-    overflow: "hidden"
+    marginTop: 52,
+    overflow: "hidden",
+    position: "relative"
   },
   cameraView: {
     flex: 1
@@ -747,16 +854,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "900"
   },
-  cameraBottom: {
-    backgroundColor: colors.background,
-    paddingBottom: 26,
-    paddingHorizontal: 22,
-    paddingTop: 18
-  },
-  capturePanel: {
-    alignItems: "center",
-    justifyContent: "center"
-  },
   shutterButton: {
     alignItems: "center",
     borderColor: colors.primary,
@@ -772,17 +869,45 @@ const styles = StyleSheet.create({
     height: 62,
     width: 62
   },
-  recordPrompt: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: 16
+  flashButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(45,37,32,0.68)",
+    borderColor: "rgba(255,255,255,0.24)",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 58,
+    justifyContent: "center",
+    width: 58
   },
-  shotPreview: {
-    alignSelf: "center",
-    borderRadius: 18,
-    height: 92,
-    marginBottom: 12,
-    width: 72
+  flipButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(45,37,32,0.68)",
+    borderColor: "rgba(255,255,255,0.24)",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 58,
+    justifyContent: "center",
+    width: 58
+  },
+  cameraBottomDock: {
+    alignItems: "center",
+    bottom: 34,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    left: 34,
+    position: "absolute",
+    right: 34,
+    zIndex: 5
+  },
+  recordPrompt: {
+    backgroundColor: "rgba(255,255,255,0.94)",
+    borderRadius: 24,
+    bottom: 28,
+    left: 18,
+    padding: 16,
+    position: "absolute",
+    right: 18,
+    zIndex: 5
   },
   recordPromptTitle: {
     color: colors.primaryDark,

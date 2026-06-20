@@ -10,7 +10,13 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "아기의 오늘을 사진으로 기록하기 위해 카메라 접근 권한이 필요합니다."
+          "cameraPermission": "오늘의 순간을 사진으로 기록하기 위해 카메라 접근 권한이 필요합니다."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "일기에 사진을 추가하기 위해 사진 보관함 접근 권한이 필요합니다."
         }
       ]
     ],
@@ -19,7 +25,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#FDF8F3"
+        "backgroundColor": "#FFF7EC"
       }
     }
   }
