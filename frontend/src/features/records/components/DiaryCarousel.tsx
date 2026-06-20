@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     width: "100%"
   },
   cardBottom: {
-    alignItems: "center",
+    alignItems: "flex-start",
     backgroundColor: "rgba(0,0,0,0.38)",
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
@@ -328,6 +328,7 @@ const styles = StyleSheet.create({
     left: 0,
     paddingBottom: 12,
     paddingTop: 10,
+    paddingLeft: 16,
     position: "absolute",
     right: 0
   },
