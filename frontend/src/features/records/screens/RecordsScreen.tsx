@@ -353,6 +353,10 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
                     </Pressable>
                   );
                 })}
+                {/* 7열을 채우기 위해 30일 뒤에 5개의 더미 투명 셀을 배치 */}
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <View key={`dummy-${index}`} style={[styles.dateCell, { backgroundColor: "transparent" }]} />
+                ))}
               </View>
             </View>
 
@@ -539,28 +543,29 @@ const styles = StyleSheet.create({
   weekRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 18
+    marginTop: 18,
+    paddingHorizontal: 2
   },
   weekText: {
     color: colors.textMuted,
     fontSize: 13,
     fontWeight: "600",
     textAlign: "center",
-    width: 38
+    width: "12%"
   },
   dateGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    justifyContent: "flex-start",
-    marginTop: 10
+    justifyContent: "space-between",
+    marginTop: 10,
+    rowGap: 8
   },
   dateCell: {
     alignItems: "center",
     aspectRatio: 1,
     backgroundColor: colors.surfaceSoft,
     borderRadius: 10,
-    height: 38,
+    width: "12%",
     justifyContent: "center",
     overflow: "hidden"
   },
