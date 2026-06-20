@@ -1,4 +1,4 @@
-import { BookOpen, ChevronLeft, Heart, Search, ShoppingBag, Stethoscope } from "lucide-react-native";
+import { BookOpen, Heart, Search, ShoppingBag, Stethoscope } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -65,9 +65,7 @@ export function CommunityScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.topNav}>
-        <View style={styles.backButton}>
-          <ChevronLeft color={colors.primaryDark} size={20} />
-        </View>
+        <View style={styles.navSideSlot} />
         <Text style={styles.navTitle}>커뮤니티</Text>
         <View style={styles.pointBadge}>
           <Text style={styles.pointText}>{points}P</Text>
@@ -120,7 +118,7 @@ export function CommunityScreen() {
                   <Text style={styles.postBody}>{post.body}</Text>
                   <View style={styles.tagRow}>
                     {post.tags.map((tag) => (
-                      <Text key={tag} style={styles.tag}>#{tag}</Text>
+                      <Text key={tag} numberOfLines={1} style={styles.tag}>#{tag}</Text>
                     ))}
                   </View>
                 </View>
@@ -162,6 +160,19 @@ export function CommunityScreen() {
   );
 }
 
+const tagBase = {
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: "900" as const,
+  height: 30,
+  lineHeight: 18,
+  minWidth: 64,
+  overflow: "hidden" as const,
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  textAlign: "center" as const
+};
+
 const styles = StyleSheet.create({
   root: {
     backgroundColor: colors.background,
@@ -172,40 +183,34 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     borderBottomWidth: 1,
     flexDirection: "row",
-    height: 60,
+    height: 56,
     justifyContent: "space-between",
-    paddingHorizontal: 20
+    paddingHorizontal: 16
   },
-  backButton: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
-    borderRadius: 999,
-    height: 44,
-    justifyContent: "center",
-    width: 44
+  navSideSlot: {
+    width: 54
   },
   navTitle: {
     color: colors.primaryDark,
     fontSize: 17,
-    fontWeight: "600",
-    lineHeight: 24
+    fontWeight: "900"
   },
   pointBadge: {
     backgroundColor: colors.blueSoft,
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 7
+    height: 30,
+    justifyContent: "center",
+    minWidth: 54,
+    paddingHorizontal: 10
   },
   pointText: {
     color: colors.primary,
     fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 18
+    fontWeight: "900",
+    textAlign: "center"
   },
   segment: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
+    backgroundColor: colors.surfaceSoft,
     borderRadius: 16,
     flexDirection: "row",
     gap: 4,
@@ -222,7 +227,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   segmentActive: {
-    backgroundColor: colors.surfaceSoft
+    backgroundColor: colors.surface
   },
   segmentText: {
     color: colors.textMuted,
@@ -231,33 +236,31 @@ const styles = StyleSheet.create({
   },
   segmentActiveText: {
     color: colors.primary,
-    fontWeight: "600"
+    fontWeight: "900"
   },
   searchBox: {
     alignItems: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSoft,
     borderColor: colors.border,
     borderRadius: 20,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
     minHeight: 52,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 13
   },
   searchText: {
     color: colors.textMuted,
     flex: 1,
-    fontSize: 14,
-    lineHeight: 20
+    fontSize: 13,
+    lineHeight: 19
   },
   list: {
     gap: 12
   },
   postCard: {
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: 24,
     padding: 16
   },
   postTop: {
@@ -266,14 +269,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   categoryPill: {
+    ...tagBase,
     backgroundColor: "rgba(255,255,255,0.75)",
-    borderRadius: 999,
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 18,
-    paddingHorizontal: 10,
-    paddingVertical: 5
+    color: colors.textMuted
   },
   likeButton: {
     alignItems: "center",
@@ -283,12 +281,12 @@ const styles = StyleSheet.create({
   likeText: {
     color: colors.textMuted,
     fontSize: 12,
-    fontWeight: "600"
+    fontWeight: "900"
   },
   postTitle: {
     color: colors.primaryDark,
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "900",
     lineHeight: 23,
     marginTop: 12
   },
@@ -301,29 +299,24 @@ const styles = StyleSheet.create({
   tagRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 7,
+    gap: 8,
     marginTop: 12
   },
   tag: {
+    ...tagBase,
     backgroundColor: "rgba(255,255,255,0.62)",
-    borderRadius: 999,
     color: colors.primary,
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 18,
-    paddingHorizontal: 8,
-    paddingVertical: 5
+    maxWidth: "100%"
   },
   askCard: {
     backgroundColor: colors.blueSoft,
-    borderRadius: 16,
+    borderRadius: 24,
     padding: 18
   },
   askTitle: {
     color: colors.primaryDark,
     fontSize: 20,
-    fontWeight: "600",
-    lineHeight: 28
+    fontWeight: "900"
   },
   askText: {
     color: colors.textMuted,
@@ -342,19 +335,19 @@ const styles = StyleSheet.create({
   askButtonText: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: "600"
+    fontWeight: "900"
   },
   qnaCard: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     padding: 16
   },
   question: {
     color: colors.primaryDark,
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "900",
     lineHeight: 22
   },
   answer: {
@@ -375,20 +368,20 @@ const styles = StyleSheet.create({
   pointButtonText: {
     color: colors.primary,
     fontSize: 12,
-    fontWeight: "600"
+    fontWeight: "900"
   },
   productCard: {
     alignItems: "center",
     backgroundColor: colors.greenSoft,
-    borderRadius: 16,
-    minHeight: 220,
+    borderRadius: 24,
     justifyContent: "center",
+    minHeight: 220,
     padding: 24
   },
   productTitle: {
     color: colors.primaryDark,
     fontSize: 20,
-    fontWeight: "600",
+    fontWeight: "900",
     marginTop: 12
   },
   productText: {

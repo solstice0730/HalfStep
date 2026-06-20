@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronLeft, Wifi } from "lucide-react-native";
+import { CheckCircle2, Wifi } from "lucide-react-native";
 import { Image, ImageSourcePropType, StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/shared/components/Screen";
@@ -39,10 +39,8 @@ export function FamilyRoomScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.topNav}>
-        <View style={styles.backButton}>
-          <ChevronLeft color={colors.primaryDark} size={20} />
-        </View>
-        <Text style={styles.navTitle}>공유방</Text>
+        <View style={styles.placeholder} />
+        <Text style={styles.navTitle}>가족방</Text>
         <View style={styles.placeholder} />
       </View>
       <Screen>
@@ -137,14 +135,6 @@ const styles = StyleSheet.create({
     height: 60,
     justifyContent: "space-between",
     paddingHorizontal: 20
-  },
-  backButton: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
-    borderRadius: 999,
-    height: 44,
-    justifyContent: "center",
-    width: 44
   },
   navTitle: {
     color: colors.primaryDark,

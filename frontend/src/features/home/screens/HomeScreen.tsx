@@ -4,14 +4,12 @@ import {
   Camera,
   ChevronDown,
   Flashlight,
-  PenLine,
-  RotateCcw,
   Send,
   Sparkles,
   X,
   Zap
 } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -19,13 +17,21 @@ import {
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  PanGestureHandler,
+  State,
+  type PanGestureHandlerGestureEvent,
+  type PanGestureHandlerStateChangeEvent
+} from "react-native-gesture-handler";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { colors } from "@/shared/constants/colors";
@@ -39,9 +45,14 @@ const curation = {
   chips: ["수유 신호", "낮잠 루틴", "배변 체크"]
 };
 
-const chatbotHomeImage = require("../../../../assets/images/chatbot-home.png");
-
 type HomeScreenProps = BottomTabScreenProps<MainTabParamList, "Home">;
+type QuickSheetType = "feed" | "medicine" | null;
+
+const formatRecordTime = (date: Date) =>
+  date.toLocaleTimeString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 
 function BabyMascot() {
   const bob = useRef(new Animated.Value(0)).current;
@@ -88,26 +99,53 @@ function BabyMascot() {
 }
 
 export function HomeScreen({ navigation }: HomeScreenProps) {
+  const insets = useSafeAreaInsets();
   const pagerRef = useRef<ScrollView>(null);
   const cameraRef = useRef<CameraView>(null);
+  const cameraTranslateX = useRef(new Animated.Value(-screenWidth)).current;
   const [permission, requestPermission] = useCameraPermissions();
   const [quickOpen, setQuickOpen] = useState(false);
+  const [quickSheet, setQuickSheet] = useState<QuickSheetType>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [facing, setFacing] = useState<"front" | "back">("back");
   const [flashOn, setFlashOn] = useState(false);
   const [lastShot, setLastShot] = useState<string | null>(null);
+  const [sleepStartedAt, setSleepStartedAt] = useState<Date | null>(null);
+  const [diaperCount, setDiaperCount] = useState(0);
+  const [lastQuickRecord, setLastQuickRecord] = useState("최근 기록 없음");
+  const [feedType, setFeedType] = useState("분유");
+  const [feedAmount, setFeedAmount] = useState("");
+  const [medicineName, setMedicineName] = useState("");
+  const [medicineDose, setMedicineDose] = useState("");
 
   const openCamera = () => {
-    pagerRef.current?.scrollTo({ x: 0, animated: true });
+    setCameraOpen(true);
+    cameraTranslateX.setValue(-screenWidth);
+    requestAnimationFrame(() => {
+      Animated.timing(cameraTranslateX, {
+        duration: 220,
+        toValue: 0,
+        useNativeDriver: true
+      }).start();
+    });
   };
 
   const closeCamera = () => {
-    pagerRef.current?.scrollTo({ x: screenWidth, animated: true });
+    Animated.timing(cameraTranslateX, {
+      duration: 190,
+      toValue: -screenWidth,
+      useNativeDriver: true
+    }).start(() => {
+      setLastShot(null);
+      setCameraOpen(false);
+    });
   };
 
   const handleMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    setCurrentPage(Math.round(event.nativeEvent.contentOffset.x / screenWidth));
+    const nextPage = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
+    setCurrentPage(nextPage);
   };
 
   const takePhoto = async () => {
@@ -125,8 +163,194 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     closeCamera();
   };
 
+  const closeQuickLog = () => {
+    setQuickOpen(false);
+  };
+
+  const recordDiaper = () => {
+    const now = new Date();
+    setDiaperCount((count) => count + 1);
+    setLastQuickRecord(`배변 1회 · ${formatRecordTime(now)}`);
+    closeQuickLog();
+  };
+
+  const toggleSleep = () => {
+    const now = new Date();
+    setSleepStartedAt((startedAt) => {
+      setLastQuickRecord(`${startedAt ? "수면 종료" : "수면 시작"} · ${formatRecordTime(now)}`);
+      return startedAt ? null : now;
+    });
+    closeQuickLog();
+  };
+
+  const openQuickSheet = (type: QuickSheetType) => {
+    setQuickSheet(type);
+    closeQuickLog();
+  };
+
+  const saveQuickSheet = () => {
+    const now = new Date();
+    if (quickSheet === "feed") {
+      setLastQuickRecord(`${feedType} ${feedAmount || "기록"} · ${formatRecordTime(now)}`);
+    }
+    if (quickSheet === "medicine") {
+      setLastQuickRecord(`${medicineName || "약"} ${medicineDose || "복용"} · ${formatRecordTime(now)}`);
+    }
+    setQuickSheet(null);
+    setFeedAmount("");
+    setMedicineName("");
+    setMedicineDose("");
+  };
+
+  const homeSwipeResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) => gesture.dx > 12 && Math.abs(gesture.dy) < 28,
+        onPanResponderGrant: () => {
+          cameraTranslateX.setValue(-screenWidth);
+          setCameraOpen(true);
+        },
+        onPanResponderMove: (_, gesture) => {
+          if (gesture.dx > 0) {
+            cameraTranslateX.setValue(Math.min(0, -screenWidth + gesture.dx));
+          }
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dx > screenWidth * 0.28 && Math.abs(gesture.dy) < 56) {
+            Animated.timing(cameraTranslateX, {
+              duration: 150,
+              toValue: 0,
+              useNativeDriver: true
+            }).start();
+            return;
+          }
+
+          Animated.timing(cameraTranslateX, {
+            duration: 160,
+            toValue: -screenWidth,
+            useNativeDriver: true
+          }).start(() => setCameraOpen(false));
+        },
+        onPanResponderTerminate: () => {
+          Animated.timing(cameraTranslateX, {
+            duration: 160,
+            toValue: -screenWidth,
+            useNativeDriver: true
+          }).start(() => setCameraOpen(false));
+        }
+      }),
+    [cameraTranslateX]
+  );
+
+  const handleCameraGesture = (event: PanGestureHandlerGestureEvent) => {
+    const { translationX } = event.nativeEvent;
+    if (translationX < 0) {
+      cameraTranslateX.setValue(Math.max(-screenWidth, translationX));
+    }
+  };
+
+  const handleCameraGestureState = (event: PanGestureHandlerStateChangeEvent) => {
+    const { oldState, translationX, velocityX } = event.nativeEvent;
+    if (oldState !== State.ACTIVE) return;
+
+    if (translationX < -screenWidth * 0.16 || velocityX < -650) {
+      closeCamera();
+      return;
+    }
+
+    Animated.spring(cameraTranslateX, {
+      toValue: 0,
+      useNativeDriver: true,
+      friction: 9,
+      tension: 80
+    }).start();
+  };
+
+  const renderHomeContent = (handlers?: ReturnType<typeof PanResponder.create>["panHandlers"]) => (
+    <View style={styles.page} {...handlers}>
+      <View style={styles.homeRoot}>
+        {quickOpen && <Pressable style={styles.quickDismissLayer} onPress={closeQuickLog} />}
+        <View style={styles.header}>
+          <Pressable style={styles.statusPill}>
+            <Text style={styles.statusText}>함께 자라는 중</Text>
+            <ChevronDown color={colors.textMuted} size={18} />
+          </Pressable>
+          <View style={styles.headerActions}>
+            <View style={styles.quickHeaderWrap}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="빠른 기록 열기"
+                style={[styles.quickLogMain, quickOpen && styles.quickLogMainActive]}
+                onPress={() => setQuickOpen((open) => !open)}
+              >
+                {quickOpen ? (
+                  <X color="#FFFFFF" size={20} />
+                ) : (
+                  <Image source={require("../../../../assets/images/quick-plus.png")} resizeMode="contain" style={styles.quickLogMainImage} />
+                )}
+              </Pressable>
+              {quickOpen && (
+                <View style={styles.quickLogMenu}>
+                  <Pressable style={styles.quickLogItem} onPress={() => openQuickSheet("feed")}>
+                    <Image source={require("../../../../assets/images/quick-feed.png")} resizeMode="contain" style={styles.quickLogIcon} />
+                    <Text style={styles.quickLogText}>수유</Text>
+                  </Pressable>
+                  <Pressable style={styles.quickLogItem} onPress={toggleSleep}>
+                    <Image source={require("../../../../assets/images/quick-sleep.png")} resizeMode="contain" style={styles.quickLogIcon} />
+                    <Text style={styles.quickLogText}>{sleepStartedAt ? "기상" : "수면"}</Text>
+                  </Pressable>
+                  <Pressable style={styles.quickLogItem} onPress={recordDiaper}>
+                    <Image source={require("../../../../assets/images/quick-diaper.png")} resizeMode="contain" style={styles.quickLogIcon} />
+                    <Text style={styles.quickLogText}>배변</Text>
+                  </Pressable>
+                  <Pressable style={styles.quickLogItem} onPress={() => openQuickSheet("medicine")}>
+                    <Image source={require("../../../../assets/images/quick-medicine.png")} resizeMode="contain" style={styles.quickLogIcon} />
+                    <Text style={styles.quickLogText}>약</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.mascotPanel}>
+          <BabyMascot />
+        </View>
+
+        <View style={styles.dayBlock}>
+          <Text style={styles.babyName}>리몽이와 만난 지</Text>
+          <Text style={styles.dayText}>{babyDay}일째</Text>
+          <Text style={styles.quickStatusText}>
+            배변 {diaperCount}회 · {sleepStartedAt ? "수면 중" : "깨어 있음"}
+          </Text>
+          <Text style={styles.quickStatusText}>{lastQuickRecord}</Text>
+        </View>
+
+        <Pressable style={styles.questionBox} onPress={() => setChatOpen(true)}>
+          <Text style={styles.questionText}>아기가 전해줬으면 하는 말이 있나요?</Text>
+          <View style={styles.sendButton}>
+            <Send color="#FFFFFF" size={18} />
+          </View>
+        </Pressable>
+
+        <View style={styles.curationCard}>
+          <View style={styles.curationHeader}>
+            <Text style={styles.curationTitle}>{curation.title}</Text>
+            <Sparkles color={colors.accent} size={18} />
+          </View>
+          <Text style={styles.curationText}>{curation.text}</Text>
+          <View style={styles.chipRow}>
+            {curation.chips.map((chip) => (
+              <Text key={chip} numberOfLines={1} style={styles.chip}>#{chip}</Text>
+            ))}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
       <ScrollView
         ref={pagerRef}
         horizontal
@@ -134,30 +358,38 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         bounces={false}
         contentOffset={{ x: screenWidth, y: 0 }}
         showsHorizontalScrollIndicator={false}
+        scrollEnabled={false}
         scrollEventThrottle={16}
         onMomentumScrollEnd={handleMomentumEnd}
         style={styles.pager}
       >
-        <View style={styles.page}>
-          <View style={styles.cameraRoot}>
-            <View style={styles.cameraTopOverlay}>
+        <View style={styles.page} />
+        {renderHomeContent(homeSwipeResponder.panHandlers)}
+      </ScrollView>
+
+      <Modal visible={cameraOpen} animationType="none" presentationStyle="fullScreen" transparent onRequestClose={closeCamera}>
+        <PanGestureHandler
+          activeOffsetX={[-8, 8]}
+          failOffsetY={[-42, 42]}
+          onGestureEvent={handleCameraGesture}
+          onHandlerStateChange={handleCameraGestureState}
+        >
+          <Animated.View style={[styles.cameraRoot, { transform: [{ translateX: cameraTranslateX }] }]}>
+            <View style={[styles.cameraTopOverlay, { paddingTop: insets.top + 12 }]}>
               <Pressable style={styles.cameraControl} onPress={closeCamera}>
                 <X color="#FFFFFF" size={25} />
               </Pressable>
               <Text style={styles.cameraTitle}>오늘 사진 기록</Text>
-              <View style={styles.cameraTopActions}>
-                <Pressable style={styles.cameraControl} onPress={() => setFlashOn((value) => !value)}>
-                  {flashOn ? <Zap color="#F5C842" size={22} /> : <Flashlight color="#FFFFFF" size={21} />}
-                </Pressable>
-                <Pressable style={styles.cameraControl} onPress={() => setFacing((value) => (value === "back" ? "front" : "back"))}>
-                  <RotateCcw color="#FFFFFF" size={22} />
-                </Pressable>
-              </View>
+              <View style={styles.cameraHeaderSpacer} />
             </View>
 
             <View style={styles.cameraStage}>
               {permission?.granted ? (
-                <CameraView ref={cameraRef} style={styles.cameraView} facing={facing} />
+                lastShot ? (
+                  <Image source={{ uri: lastShot }} resizeMode="cover" style={styles.cameraView} />
+                ) : (
+                  <CameraView ref={cameraRef} style={styles.cameraView} facing={facing} />
+                )
               ) : (
                 <View style={styles.permissionBox}>
                   <Camera color="#FFFFFF" size={52} />
@@ -168,13 +400,22 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                   </Pressable>
                 </View>
               )}
-            </View>
-
-            <View style={styles.cameraBottom}>
-              {lastShot ? (
+              {!lastShot && permission?.granted && (
+                <View style={styles.cameraBottomDock}>
+                  <Pressable style={styles.flashButton} onPress={() => setFlashOn((value) => !value)}>
+                    {flashOn ? <Zap color="#F5C842" size={22} /> : <Flashlight color="#FFFFFF" size={21} />}
+                  </Pressable>
+                  <Pressable style={styles.shutterButton} onPress={takePhoto}>
+                    <View style={styles.shutterInner} />
+                  </Pressable>
+                  <Pressable style={styles.flipButton} onPress={() => setFacing((value) => (value === "back" ? "front" : "back"))}>
+                    <Camera color="#FFFFFF" size={23} />
+                  </Pressable>
+                </View>
+              )}
+              {lastShot && (
                 <View style={styles.recordPrompt}>
-                  <Image source={{ uri: lastShot }} style={styles.shotPreview} />
-                  <Text style={styles.recordPromptTitle}>방금 찍은 사진으로 일기를 쓸까요?</Text>
+                  <Text style={styles.recordPromptTitle}>이 사진을 일기에 올릴까요?</Text>
                   <Text style={styles.recordPromptText}>일기 작성 화면에 사진이 자동으로 추가돼요.</Text>
                   <View style={styles.recordPromptActions}>
                     <Pressable style={styles.retakeButton} onPress={() => setLastShot(null)}>
@@ -185,95 +426,69 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                     </Pressable>
                   </View>
                 </View>
-              ) : (
-                <View style={styles.capturePanel}>
-                  <Pressable style={styles.shutterButton} onPress={takePhoto}>
-                    <View style={styles.shutterInner} />
-                  </Pressable>
-                </View>
               )}
             </View>
-          </View>
-        </View>
-
-        <View style={styles.page}>
-          <View style={styles.homeRoot}>
-            <View style={styles.header}>
-              <Pressable style={styles.statusPill}>
-                <Text style={styles.statusText}>함께 자라는 중</Text>
-                <ChevronDown color={colors.textMuted} size={18} />
-              </Pressable>
-              <View style={styles.headerActions}>
-                <Pressable style={styles.quickButton} onPress={() => setQuickOpen(true)}>
-                  <PenLine color="#FFFFFF" size={18} />
-                </Pressable>
-                <Pressable style={styles.cameraButton} onPress={openCamera}>
-                  <Camera color={colors.primaryDark} size={18} />
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.mascotPanel}>
-              <BabyMascot />
-            </View>
-
-            <View style={styles.dayBlock}>
-              <Text style={styles.babyName}>리몽이와 만난 지</Text>
-              <Text style={styles.dayText}>{babyDay}일째</Text>
-            </View>
-
-            <Pressable style={styles.questionBox} onPress={() => setChatOpen(true)}>
-              <Text style={styles.questionText}>아기가 전해줬으면 하는 말이 있나요?</Text>
-              <View style={styles.sendButton}>
-                <Send color="#FFFFFF" size={18} />
-              </View>
-            </Pressable>
-
-            <View style={styles.curationCard}>
-              <View style={styles.curationHeader}>
-                <Text style={styles.curationTitle}>{curation.title}</Text>
-                <Sparkles color={colors.accent} size={18} />
-              </View>
-              <Text style={styles.curationText}>{curation.text}</Text>
-              <View style={styles.chipRow}>
-                {curation.chips.map((chip) => (
-                  <Text key={chip} style={styles.chip}>#{chip}</Text>
-                ))}
-              </View>
-            </View>
-
-          </View>
-        </View>
-      </ScrollView>
-
-      {currentPage === 1 && (
-        <View style={styles.pageDots}>
-          <View style={[styles.pageDot, styles.pageDotActive]} />
-          <View style={styles.pageDot} />
-        </View>
-      )}
+          </Animated.View>
+        </PanGestureHandler>
+      </Modal>
 
       {currentPage === 1 && (
         <Pressable style={styles.chatFloat} onPress={() => setChatOpen(true)}>
-          <Image source={chatbotHomeImage} resizeMode="contain" style={styles.chatFloatImage} />
+          <Image source={require("../../../../assets/images/chatbot-home.png")} resizeMode="contain" style={styles.chatFloatImage} />
         </Pressable>
       )}
 
-      <Modal visible={quickOpen} transparent animationType="slide" onRequestClose={() => setQuickOpen(false)}>
+      <Modal visible={quickSheet !== null} transparent animationType="slide" onRequestClose={() => setQuickSheet(null)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.sheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>빠른 기록하기</Text>
-              <Pressable onPress={() => setQuickOpen(false)}>
+              <Text style={styles.modalTitle}>{quickSheet === "feed" ? "수유 기록" : "약 기록"}</Text>
+              <Pressable onPress={() => setQuickSheet(null)}>
                 <X color={colors.primaryDark} size={22} />
               </Pressable>
             </View>
-            <Text style={styles.modalText}>오늘의 순간을 일기로 남겨보세요. 기록 탭에서 사진과 함께 작성할 수 있어요.</Text>
-            <Pressable style={styles.writeDiaryButton} onPress={() => {
-              setQuickOpen(false);
-              navigation.navigate("Records", undefined);
-            }}>
-              <Text style={styles.writeDiaryButtonText}>일기 쓰러가기</Text>
+            {quickSheet === "feed" ? (
+              <>
+                <View style={styles.segmentInputRow}>
+                  {["분유", "모유"].map((type) => (
+                    <Pressable
+                      key={type}
+                      style={[styles.segmentInput, feedType === type && styles.segmentInputActive]}
+                      onPress={() => setFeedType(type)}
+                    >
+                      <Text style={[styles.segmentInputText, feedType === type && styles.segmentInputTextActive]}>{type}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <TextInput
+                  keyboardType="number-pad"
+                  placeholder="수유량 또는 시간"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.sheetInput}
+                  value={feedAmount}
+                  onChangeText={setFeedAmount}
+                />
+              </>
+            ) : (
+              <>
+                <TextInput
+                  placeholder="약 종류"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.sheetInput}
+                  value={medicineName}
+                  onChangeText={setMedicineName}
+                />
+                <TextInput
+                  placeholder="복용량"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.sheetInput}
+                  value={medicineDose}
+                  onChangeText={setMedicineDose}
+                />
+              </>
+            )}
+            <Pressable style={styles.writeDiaryButton} onPress={saveQuickSheet}>
+              <Text style={styles.writeDiaryButtonText}>저장하기</Text>
             </Pressable>
           </View>
         </View>
@@ -289,7 +504,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
               </Pressable>
             </View>
             <View style={styles.chatBotFace}>
-              <Image source={chatbotHomeImage} resizeMode="contain" style={styles.chatBotImage} />
+              <Image source={require("../../../../assets/images/chatbot-home.png")} resizeMode="contain" style={styles.chatBotImage} />
             </View>
             <Text style={styles.chatQuestion}>리몽이의 기록을 바탕으로 무엇을 알려드릴까요?</Text>
             <Text style={styles.chatBubble}>예: 요즘 낮잠이 짧아졌는데 괜찮을까요?</Text>
@@ -315,15 +530,24 @@ const styles = StyleSheet.create({
   },
   homeRoot: {
     flex: 1,
-    gap: 16,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    paddingTop: 16
+    gap: 13,
+    paddingBottom: 18,
+    paddingHorizontal: 18,
+    paddingTop: 14
+  },
+  quickDismissLayer: {
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+    zIndex: 10
   },
   header: {
     alignItems: "center",
     flexDirection: "row",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    zIndex: 20
   },
   statusPill: {
     alignItems: "center",
@@ -333,205 +557,100 @@ const styles = StyleSheet.create({
   statusText: {
     color: colors.primaryDark,
     fontSize: 24,
-    fontWeight: "600",
-    lineHeight: 32
+    fontWeight: "900"
   },
   headerActions: {
     flexDirection: "row",
     gap: 8
   },
-  quickButton: {
-    alignItems: "center",
-    backgroundColor: colors.accent,
-    borderRadius: 14,
-    height: 44,
-    justifyContent: "center",
-    width: 44
-  },
-  cameraButton: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 14,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: "center",
-    width: 44
-  },
   mascotPanel: {
     flex: 1.15,
     justifyContent: "center",
-    minHeight: 304
+    minHeight: 270,
+    position: "relative"
   },
   mascotWrap: {
     alignItems: "center",
     alignSelf: "center",
-    height: 300,
+    height: 228,
     justifyContent: "center",
-    width: 228
+    width: 174
   },
   mascotImage: {
-    height: 300,
-    width: 228
+    height: 228,
+    width: 174
   },
-  mascotBody: {
+  quickHeaderWrap: {
     alignItems: "center",
-    backgroundColor: "#F9BE9F",
-    borderColor: "rgba(255,255,255,0.7)",
-    borderRadius: 58,
-    borderWidth: 4,
-    height: 132,
-    justifyContent: "flex-start",
-    marginTop: 36,
-    width: 116
+    gap: 8,
+    position: "relative",
+    zIndex: 30
   },
-  mascotHead: {
+  quickLogMenu: {
     alignItems: "center",
-    backgroundColor: "#F7B891",
-    borderRadius: 64,
-    height: 118,
-    justifyContent: "center",
-    marginTop: -62,
-    width: 118
-  },
-  hairCurl: {
-    borderColor: colors.primaryDark,
-    borderLeftWidth: 0,
-    borderRadius: 18,
-    borderTopWidth: 3,
-    height: 22,
+    gap: 8,
     position: "absolute",
-    top: -6,
-    transform: [{ rotate: "-18deg" }],
-    width: 28
-  },
-  ear: {
-    backgroundColor: "#F2A783",
-    borderRadius: 999,
-    height: 24,
-    position: "absolute",
-    top: 48,
-    width: 18
-  },
-  leftEar: {
-    left: -7
-  },
-  rightEar: {
-    right: -7
-  },
-  cheek: {
-    backgroundColor: "rgba(255,159,142,0.5)",
-    borderRadius: 999,
-    height: 14,
-    position: "absolute",
-    top: 68,
-    width: 18
-  },
-  leftCheek: {
-    left: 22
-  },
-  rightCheek: {
-    right: 22
-  },
-  eye: {
-    backgroundColor: colors.primaryDark,
-    borderRadius: 999,
-    height: 7,
-    position: "absolute",
+    right: 0,
     top: 54,
-    width: 7
+    width: 92
   },
-  leftEye: {
-    left: 38
-  },
-  rightEye: {
-    right: 38
-  },
-  mouth: {
-    borderBottomColor: colors.primaryDark,
-    borderBottomWidth: 3,
-    borderRadius: 999,
-    height: 18,
-    position: "absolute",
-    top: 62,
-    width: 28
-  },
-  bow: {
+  quickLogItem: {
     alignItems: "center",
-    flexDirection: "row",
-    gap: 2,
-    position: "absolute",
-    right: 10,
-    top: 12,
-    transform: [{ rotate: "20deg" }]
-  },
-  bowWing: {
-    backgroundColor: colors.accent,
-    borderRadius: 8,
-    height: 16,
-    width: 18
-  },
-  bowCenter: {
-    backgroundColor: colors.primary,
-    borderRadius: 999,
-    height: 10,
-    width: 10
-  },
-  diaper: {
     backgroundColor: colors.surface,
-    borderRadius: 22,
-    bottom: 16,
-    height: 36,
-    position: "absolute",
-    width: 70
+    borderColor: colors.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 3,
+    height: 44,
+    justifyContent: "center",
+    width: 64
   },
-  arm: {
-    backgroundColor: "#F7B891",
+  quickLogIcon: {
+    height: 24,
+    width: 26
+  },
+  quickLogText: {
+    color: colors.primaryDark,
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  quickLogMain: {
+    alignItems: "center",
+    backgroundColor: colors.accent,
+    borderColor: colors.surface,
     borderRadius: 999,
-    height: 22,
-    position: "absolute",
-    top: 28,
-    width: 48
+    borderWidth: 3,
+    height: 46,
+    justifyContent: "center",
+    width: 46
   },
-  leftArm: {
-    left: -28,
-    transform: [{ rotate: "-28deg" }]
+  quickLogMainActive: {
+    backgroundColor: colors.primary
   },
-  rightArm: {
-    right: -30,
-    transform: [{ rotate: "24deg" }]
-  },
-  leg: {
-    backgroundColor: "#F2A783",
-    borderRadius: 999,
-    bottom: -8,
-    height: 26,
-    position: "absolute",
-    width: 34
-  },
-  leftLeg: {
-    left: 22,
-    transform: [{ rotate: "16deg" }]
-  },
-  rightLeg: {
-    right: 22,
-    transform: [{ rotate: "-16deg" }]
+  quickLogMainImage: {
+    height: 28,
+    width: 28
   },
   dayBlock: {
     marginTop: -2
   },
   babyName: {
     color: colors.primaryDark,
-    fontSize: 16,
-    fontWeight: "600",
-    lineHeight: 24
+    fontSize: 17,
+    fontWeight: "900"
   },
   dayText: {
     color: colors.primaryDark,
-    fontSize: 42,
-    fontWeight: "700",
+    fontSize: 46,
+    fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 52
+  },
+  quickStatusText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 2
   },
   questionBox: {
     alignItems: "center",
@@ -540,15 +659,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     minHeight: 52,
-    paddingHorizontal: 16,
-    paddingVertical: 12
+    paddingHorizontal: 18,
+    paddingVertical: 13
   },
   questionText: {
     color: colors.textMuted,
     flex: 1,
     fontSize: 15,
-    fontWeight: "400",
-    lineHeight: 22
+    fontWeight: "700"
   },
   sendButton: {
     alignItems: "center",
@@ -562,10 +680,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderLeftColor: colors.accent,
-    borderLeftWidth: 3,
-    borderRadius: 16,
+    borderLeftWidth: 4,
+    borderRadius: 22,
     borderWidth: 1,
-    padding: 16
+    padding: 13
   },
   curationHeader: {
     alignItems: "center",
@@ -575,51 +693,35 @@ const styles = StyleSheet.create({
   curationTitle: {
     color: colors.primaryDark,
     flex: 1,
-    fontSize: 16,
-    fontWeight: "600",
-    lineHeight: 24
+    fontSize: 15,
+    fontWeight: "900"
   },
   curationText: {
     color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 8
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 7
   },
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginTop: 12
+    marginTop: 9
   },
   chip: {
     backgroundColor: colors.blueSoft,
     borderRadius: 999,
     color: colors.primary,
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 11,
+    fontWeight: "800",
+    height: 30,
     lineHeight: 18,
+    maxWidth: "100%",
+    minWidth: 66,
+    overflow: "hidden",
     paddingHorizontal: 10,
-    paddingVertical: 7
-  },
-  pageDots: {
-    alignItems: "center",
-    bottom: 8,
-    flexDirection: "row",
-    gap: 5,
-    justifyContent: "center",
-    left: 0,
-    position: "absolute",
-    right: 0
-  },
-  pageDot: {
-    backgroundColor: colors.border,
-    borderRadius: 999,
-    height: 5,
-    width: 5
-  },
-  pageDotActive: {
-    backgroundColor: colors.primary,
-    width: 16
+    paddingVertical: 6,
+    textAlign: "center"
   },
   chatFloat: {
     alignItems: "center",
@@ -640,29 +742,29 @@ const styles = StyleSheet.create({
   },
   cameraRoot: {
     backgroundColor: colors.background,
-    flex: 1
+    flex: 1,
+    paddingBottom: 16,
+    paddingHorizontal: 12,
+    paddingTop: 10
   },
   cameraTopOverlay: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    left: 0,
-    paddingHorizontal: 20,
-    paddingTop: 12,
+    left: 12,
+    paddingHorizontal: 14,
     position: "absolute",
-    right: 0,
+    right: 12,
     top: 0,
     zIndex: 10
   },
   cameraTitle: {
     color: colors.primaryDark,
     fontSize: 16,
-    fontWeight: "600",
-    lineHeight: 24
+    fontWeight: "900"
   },
-  cameraTopActions: {
-    flexDirection: "row",
-    gap: 10
+  cameraHeaderSpacer: {
+    width: 42
   },
   cameraControl: {
     alignItems: "center",
@@ -674,11 +776,11 @@ const styles = StyleSheet.create({
   },
   cameraStage: {
     backgroundColor: "#111111",
-    borderRadius: 24,
+    borderRadius: 34,
     flex: 1,
-    margin: 20,
-    marginTop: 66,
-    overflow: "hidden"
+    marginTop: 52,
+    overflow: "hidden",
+    position: "relative"
   },
   cameraView: {
     flex: 1
@@ -693,7 +795,7 @@ const styles = StyleSheet.create({
   permissionTitle: {
     color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: "900",
     marginTop: 14
   },
   permissionText: {
@@ -707,24 +809,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 999,
     marginTop: 18,
-    minHeight: 44,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingVertical: 12
   },
   permissionButtonText: {
     color: colors.primaryDark,
     fontSize: 14,
-    fontWeight: "600"
-  },
-  cameraBottom: {
-    backgroundColor: colors.background,
-    paddingBottom: 26,
-    paddingHorizontal: 20,
-    paddingTop: 18
-  },
-  capturePanel: {
-    alignItems: "center",
-    justifyContent: "center"
+    fontWeight: "900"
   },
   shutterButton: {
     alignItems: "center",
@@ -741,22 +832,50 @@ const styles = StyleSheet.create({
     height: 62,
     width: 62
   },
-  recordPrompt: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16
+  flashButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(45,37,32,0.68)",
+    borderColor: "rgba(255,255,255,0.24)",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 58,
+    justifyContent: "center",
+    width: 58
   },
-  shotPreview: {
-    alignSelf: "center",
-    borderRadius: 18,
-    height: 92,
-    marginBottom: 12,
-    width: 72
+  flipButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(45,37,32,0.68)",
+    borderColor: "rgba(255,255,255,0.24)",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 58,
+    justifyContent: "center",
+    width: 58
+  },
+  cameraBottomDock: {
+    alignItems: "center",
+    bottom: 34,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    left: 34,
+    position: "absolute",
+    right: 34,
+    zIndex: 5
+  },
+  recordPrompt: {
+    backgroundColor: "rgba(255,255,255,0.94)",
+    borderRadius: 24,
+    bottom: 28,
+    left: 18,
+    padding: 16,
+    position: "absolute",
+    right: 18,
+    zIndex: 5
   },
   recordPromptTitle: {
     color: colors.primaryDark,
     fontSize: 17,
-    fontWeight: "600",
+    fontWeight: "900",
     textAlign: "center"
   },
   recordPromptText: {
@@ -776,38 +895,36 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSoft,
     borderRadius: 999,
     flex: 1,
-    minHeight: 44,
     paddingVertical: 12
   },
   retakeButtonText: {
     color: colors.primaryDark,
     fontSize: 13,
-    fontWeight: "600"
+    fontWeight: "900"
   },
   addRecordButton: {
     alignItems: "center",
     backgroundColor: colors.accent,
     borderRadius: 999,
     flex: 1,
-    minHeight: 44,
     paddingVertical: 12
   },
   addRecordButtonText: {
     color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: "600"
+    fontWeight: "900"
   },
   modalBackdrop: {
     backgroundColor: "rgba(45,37,32,0.36)",
     flex: 1,
     justifyContent: "flex-end",
-    padding: 20
+    padding: 16
   },
   sheet: {
     backgroundColor: colors.background,
-    borderRadius: 24,
+    borderRadius: 28,
     gap: 14,
-    padding: 20
+    padding: 18
   },
   modalHeader: {
     alignItems: "center",
@@ -818,30 +935,61 @@ const styles = StyleSheet.create({
   modalTitle: {
     color: colors.primaryDark,
     fontSize: 19,
-    fontWeight: "600",
-    lineHeight: 26
+    fontWeight: "900"
   },
   modalText: {
     color: colors.textMuted,
     fontSize: 14,
     lineHeight: 22
   },
+  segmentInputRow: {
+    flexDirection: "row",
+    gap: 8
+  },
+  segmentInput: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: 16,
+    flex: 1,
+    minHeight: 44,
+    justifyContent: "center"
+  },
+  segmentInputActive: {
+    backgroundColor: colors.primary
+  },
+  segmentInputText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  segmentInputTextActive: {
+    color: "#FFFFFF"
+  },
+  sheetInput: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    color: colors.primaryDark,
+    fontSize: 14,
+    minHeight: 48,
+    paddingHorizontal: 14
+  },
   writeDiaryButton: {
     alignItems: "center",
     backgroundColor: colors.accent,
-    borderRadius: 16,
-    minHeight: 48,
+    borderRadius: 18,
     padding: 14
   },
   writeDiaryButtonText: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "900"
   },
   chatModal: {
     alignItems: "center",
     backgroundColor: colors.background,
-    borderRadius: 24,
+    borderRadius: 28,
     gap: 14,
     padding: 20
   },
@@ -860,7 +1008,7 @@ const styles = StyleSheet.create({
   chatQuestion: {
     color: colors.primaryDark,
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: "900",
     lineHeight: 25,
     textAlign: "center"
   },
@@ -875,7 +1023,7 @@ const styles = StyleSheet.create({
   subscriptionNote: {
     color: colors.primary,
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "800",
     textAlign: "center"
   }
 });
