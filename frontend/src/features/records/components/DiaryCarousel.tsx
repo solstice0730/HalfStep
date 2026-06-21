@@ -71,17 +71,25 @@ export function StoryCarousel({ stories, dates, initialDate, onClose }: StoryCar
     }).start(onClose);
   }, [dragY, onClose]);
 
+  const shouldCaptureGesture = (dx: number, dy: number) =>
+    (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) ||
+    (dy > 10 && Math.abs(dy) > Math.abs(dx));
+
   const panResponder = useMemo(
     () =>
       PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onStartShouldSetPanResponderCapture: () => false,
+        onMoveShouldSetPanResponderCapture: (_, gesture) =>
+          shouldCaptureGesture(gesture.dx, gesture.dy),
         onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dx) > 8 || Math.abs(gesture.dy) > 8,
+          shouldCaptureGesture(gesture.dx, gesture.dy),
         onPanResponderGrant: () => {
           offsetX.stopAnimation();
           dragY.stopAnimation();
         },
         onPanResponderMove: (_, gesture) => {
-          if (Math.abs(gesture.dy) > Math.abs(gesture.dx) && gesture.dy > 0) {
+          if (gesture.dy > 0 && Math.abs(gesture.dy) > Math.abs(gesture.dx)) {
             dragY.setValue(gesture.dy);
             return;
           }
@@ -118,6 +126,8 @@ export function StoryCarousel({ stories, dates, initialDate, onClose }: StoryCar
         },
         onPanResponderTerminate: () => {
           Animated.spring(dragY, {
+            friction: 9,
+            tension: 70,
             toValue: 0,
             useNativeDriver: true
           }).start();
@@ -135,19 +145,16 @@ export function StoryCarousel({ stories, dates, initialDate, onClose }: StoryCar
   });
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={styles.container}>
       <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]} />
-      <View style={styles.topBar}>
+      <View style={styles.topBar} pointerEvents="box-none">
         <Text style={styles.topTitle}>6월 {dates[activeIndex]}일</Text>
         <Pressable hitSlop={14} style={styles.closeButton} onPress={onClose}>
           <X color="#FFFFFF" size={22} />
         </Pressable>
       </View>
 
-      <Animated.View
-        style={[styles.stage, { transform: [{ translateY: dragY }] }]}
-        {...panResponder.panHandlers}
-      >
+      <Animated.View style={[styles.stage, { transform: [{ translateY: dragY }] }]}>
         {dates.map((date, index) => {
           const story = stories[date];
           const center = -index * cardStep;
@@ -175,9 +182,15 @@ export function StoryCarousel({ stories, dates, initialDate, onClose }: StoryCar
                   zIndex: index === activeIndex ? 10 : 3
                 }
               ]}
+              {...panResponder.panHandlers}
             >
-              <ImageBackground imageStyle={styles.cardImage} source={{ uri: story.image }} style={styles.card}>
-                <View style={styles.imageShade} />
+              <ImageBackground
+                imageStyle={styles.cardImage}
+                source={{ uri: story.image }}
+                style={styles.card}
+                {...panResponder.panHandlers}
+              >
+                <View style={styles.imageShade} pointerEvents="none" />
                 <View style={styles.textPanel}>
                   <Text style={styles.storyTitle}>{story.title}</Text>
                   <ScrollView style={styles.storyTextScroll}>
@@ -191,20 +204,41 @@ export function StoryCarousel({ stories, dates, initialDate, onClose }: StoryCar
                     ))}
                   </View>
                 </View>
+                <View
+                  collapsable={false}
+                  pointerEvents="box-only"
+                  style={styles.cardGestureLayer}
+                  {...panResponder.panHandlers}
+                />
               </ImageBackground>
             </Animated.View>
           );
         })}
+        <View
+          collapsable={false}
+          pointerEvents="box-only"
+          style={styles.stageGestureLayer}
+          {...PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onStartShouldSetPanResponderCapture: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponderCapture: () => true,
+            onPanResponderGrant: panResponder.panHandlers.onResponderGrant,
+            onPanResponderMove: panResponder.panHandlers.onResponderMove,
+            onPanResponderRelease: panResponder.panHandlers.onResponderRelease,
+            onPanResponderTerminate: panResponder.panHandlers.onResponderTerminate
+          }).panHandlers}
+        />
       </Animated.View>
 
       {activeStory && (
-        <View style={styles.pagination}>
+        <View style={styles.pagination} pointerEvents="none">
           {dates.map((date, index) => (
             <View key={date} style={[styles.dot, index === activeIndex && styles.dotActive]} />
           ))}
         </View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -242,11 +276,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "visible"
   },
+  stageGestureLayer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "transparent",
+    zIndex: 40
+  },
   cardShell: {
     height: cardHeight,
+    marginTop: -(cardHeight / 2),
     position: "absolute",
     top: "50%",
-    marginTop: -(cardHeight / 2),
     width: cardWidth
   },
   card: {
@@ -261,6 +300,11 @@ const styles = StyleSheet.create({
   imageShade: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.18)"
+  },
+  cardGestureLayer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "transparent",
+    zIndex: 30
   },
   textPanel: {
     backgroundColor: "rgba(17,24,39,0.56)",

@@ -367,7 +367,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         {renderHomeContent(homeSwipeResponder.panHandlers)}
       </ScrollView>
 
-      <Modal visible={cameraOpen} animationType="none" presentationStyle="fullScreen" transparent onRequestClose={closeCamera}>
+      <Modal visible={cameraOpen} animationType="none" transparent onRequestClose={closeCamera}>
         <PanGestureHandler
           activeOffsetX={[-8, 8]}
           failOffsetY={[-42, 42]}

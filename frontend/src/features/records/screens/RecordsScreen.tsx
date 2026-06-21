@@ -1,13 +1,16 @@
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import * as ImagePicker from "expo-image-picker";
 import { Camera, ImagePlus, PenLine, Save, X } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
+  Dimensions,
   Image,
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -19,7 +22,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { StoryCarousel } from "@/features/records/components/DiaryCarousel";
+import { StoryCarousel } from "../components/DiaryCarousel";
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { colors } from "@/shared/constants/colors";
 
@@ -33,6 +36,7 @@ export type Story = {
 };
 
 const calendarDays = Array.from({ length: 30 }, (_, index) => index + 1);
+const screenWidth = Dimensions.get("window").width;
 const todayDate = 20;
 const samplePhoto = "https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1200&auto=format&fit=crop";
 
@@ -78,8 +82,10 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
   const [draftText, setDraftText] = useState("");
   const [draftImageUri, setDraftImageUri] = useState<string | undefined>();
   const processedCameraUri = useRef<string | undefined>(undefined);
+  const previewTranslateX = useRef(new Animated.Value(0)).current;
 
   const selectedStory = stories[selectedDate];
+  const storyDates = useMemo(() => calendarDays.filter((date) => stories[date]), [stories]);
 
   useEffect(() => {
     const uri = route.params?.draftImageUri;
@@ -111,6 +117,86 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
     setDraftText("");
     setEditorOpen(true);
   };
+
+  const snapPreviewToDate = (direction: -1 | 1) => {
+    if (storyDates.length <= 1) {
+      Animated.spring(previewTranslateX, {
+        friction: 9,
+        tension: 80,
+        toValue: 0,
+        useNativeDriver: true
+      }).start();
+      return;
+    }
+
+    const currentIndex = storyDates.includes(selectedDate)
+      ? storyDates.indexOf(selectedDate)
+      : storyDates.findIndex((date) => date > selectedDate);
+    const safeIndex = currentIndex === -1 ? storyDates.length - 1 : currentIndex;
+    const nextIndex = Math.max(0, Math.min(storyDates.length - 1, safeIndex + direction));
+
+    if (nextIndex === safeIndex) {
+      Animated.spring(previewTranslateX, {
+        friction: 9,
+        tension: 80,
+        toValue: 0,
+        useNativeDriver: true
+      }).start();
+      return;
+    }
+
+    Animated.timing(previewTranslateX, {
+      duration: 140,
+      toValue: -direction * screenWidth,
+      useNativeDriver: true
+    }).start(() => {
+      setSelectedDate(storyDates[nextIndex]);
+      previewTranslateX.setValue(direction * screenWidth);
+      Animated.spring(previewTranslateX, {
+        friction: 9,
+        tension: 74,
+        toValue: 0,
+        useNativeDriver: true
+      }).start();
+    });
+  };
+
+  const previewPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onPanResponderGrant: () => {
+          previewTranslateX.stopAnimation();
+        },
+        onPanResponderMove: (_, gesture) => {
+          previewTranslateX.setValue(gesture.dx);
+        },
+        onPanResponderRelease: (_, gesture) => {
+          const threshold = screenWidth * 0.18;
+          if (Math.abs(gesture.dx) > threshold || Math.abs(gesture.vx) > 0.55) {
+            snapPreviewToDate(gesture.dx < 0 ? 1 : -1);
+            return;
+          }
+
+          Animated.spring(previewTranslateX, {
+            friction: 9,
+            tension: 80,
+            toValue: 0,
+            useNativeDriver: true
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(previewTranslateX, {
+            friction: 9,
+            tension: 80,
+            toValue: 0,
+            useNativeDriver: true
+          }).start();
+        }
+      }),
+    [previewTranslateX, selectedDate, storyDates]
+  );
 
   const closeEditor = () => {
     Keyboard.dismiss();
@@ -219,23 +305,28 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
               </View>
             </View>
 
-            <Pressable style={styles.previewCard} onPress={() => selectedStory ? openStory(selectedDate) : openEditor()}>
-              {selectedStory ? (
-                <ImageBackground imageStyle={styles.previewImage} source={{ uri: selectedStory.image }} style={styles.previewImageBox}>
-                  <View style={styles.previewOverlay}>
-                    <Text style={styles.previewDate}>6월 {selectedDate}일</Text>
-                    <Text style={styles.previewTitle}>{selectedStory.title}</Text>
-                    <Text numberOfLines={2} style={styles.previewText}>{selectedStory.text}</Text>
+            <Animated.View
+              style={[styles.previewSwipeWrap, { transform: [{ translateX: previewTranslateX }] }]}
+              {...previewPanResponder.panHandlers}
+            >
+              <Pressable style={styles.previewCard} onPress={() => selectedStory ? openStory(selectedDate) : openEditor()}>
+                {selectedStory ? (
+                  <ImageBackground imageStyle={styles.previewImage} source={{ uri: selectedStory.image }} style={styles.previewImageBox}>
+                    <View style={styles.previewOverlay}>
+                      <Text style={styles.previewDate}>6월 {selectedDate}일</Text>
+                      <Text style={styles.previewTitle}>{selectedStory.title}</Text>
+                      <Text numberOfLines={2} style={styles.previewText}>{selectedStory.text}</Text>
+                    </View>
+                  </ImageBackground>
+                ) : (
+                  <View style={styles.emptyStory}>
+                    <ImagePlus color={colors.primary} size={34} />
+                    <Text style={styles.emptyTitle}>이 날짜에 일기를 남겨보세요</Text>
+                    <Text style={styles.emptyText}>사진을 추가하면 캘린더 썸네일과 스토리에 바로 보여요.</Text>
                   </View>
-                </ImageBackground>
-              ) : (
-                <View style={styles.emptyStory}>
-                  <ImagePlus color={colors.primary} size={34} />
-                  <Text style={styles.emptyTitle}>이 날짜에 일기를 남겨보세요</Text>
-                  <Text style={styles.emptyText}>사진을 추가하면 캘린더 썸네일과 스토리에 바로 보여요.</Text>
-                </View>
-              )}
-            </Pressable>
+                )}
+              </Pressable>
+            </Animated.View>
           </View>
         </SafeAreaView>
       )}
@@ -464,6 +555,10 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 190,
     overflow: "hidden"
+  },
+  previewSwipeWrap: {
+    flex: 1,
+    minHeight: 190
   },
   previewImageBox: {
     flex: 1
