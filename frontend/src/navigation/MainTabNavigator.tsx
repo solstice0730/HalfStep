@@ -9,7 +9,7 @@ import { colors } from "@/shared/constants/colors";
 
 export type MainTabParamList = {
   Home: undefined;
-  Records: undefined;
+  Records: { draftImageUri?: string } | undefined;
   Family: undefined;
   Community: undefined;
 };
@@ -56,7 +56,7 @@ export function MainTabNavigator() {
         name="Family"
         component={FamilyRoomScreen}
         options={{
-          title: "공유",
+          title: "가족방",
           tabBarIcon: ({ color, size }) => <Share2 color={color} size={size} />
         }}
       />

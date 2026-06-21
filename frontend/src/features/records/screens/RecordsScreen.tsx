@@ -1,107 +1,309 @@
-import { ChevronLeft, MessageCircle, Sparkles } from "lucide-react-native";
-import { ImageBackground, StyleSheet, Text, View } from "react-native";
+import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import * as ImagePicker from "expo-image-picker";
+import { Camera, ImagePlus, PenLine, Save, X } from "lucide-react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  Image,
+  ImageBackground,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableWithoutFeedback,
+  View
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Screen } from "@/shared/components/Screen";
+import { StoryCarousel } from "@/features/records/components/DiaryCarousel";
+import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { colors } from "@/shared/constants/colors";
 
-const days = [
-  { weekday: "일", date: "31" },
-  { weekday: "월", date: "1" },
-  { weekday: "화", date: "2" },
-  { weekday: "수", date: "3" },
-  { weekday: "목", date: "4" },
-  { weekday: "금", date: "5" }
-];
+type RecordsScreenProps = BottomTabScreenProps<MainTabParamList, "Records">;
 
-const timeline = [
-  { emoji: "🍼", title: "모유 수유", time: "오전 07:30", detail: "120ml (왼쪽 15분, 오른쪽 15분)", color: colors.peachSoft },
-  { emoji: "👶", title: "배변", time: "오전 09:00", detail: "소변 (물세척 완료)", color: colors.greenSoft },
-  { emoji: "🌙", title: "낮잠", time: "오후 04:00", detail: "45분 (얕은 잠)", color: colors.blueSoft },
-  { emoji: "🍼", title: "모유 수유", time: "오후 06:15", detail: "130ml (왼쪽 20분)", color: colors.peachSoft }
-];
+export type Story = {
+  title: string;
+  text: string;
+  image: string;
+  summary: string[];
+};
 
-export function RecordsScreen() {
+const calendarDays = Array.from({ length: 30 }, (_, index) => index + 1);
+const todayDate = 20;
+const samplePhoto = "https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1200&auto=format&fit=crop";
+
+const initialStories: Record<number, Story> = {
+  5: {
+    title: "처음 길게 웃어준 날",
+    text: "아침 수유 후 눈을 맞추자 오래 웃어줬어요. 짧은 순간이었지만 하루 종일 마음에 남는 장면이었어요.",
+    image: "https://images.unsplash.com/photo-1442458370899-ae20e367c5d8?q=80&w=1200&auto=format&fit=crop",
+    summary: ["웃음", "수유", "가족"]
+  },
+  10: {
+    title: "햇살 아래 낮잠",
+    text: "창가에 들어온 햇살을 받으며 편안하게 잠들었어요. 방 안이 조용하고 따뜻해서 사진으로 꼭 남기고 싶었어요.",
+    image: "https://images.unsplash.com/photo-1561640361-79ec50cf0cd3?q=80&w=1200&auto=format&fit=crop",
+    summary: ["낮잠", "햇살", "평온"]
+  },
+  15: {
+    title: "목욕하고 뽀송한 저녁",
+    text: "목욕 뒤 보송한 옷을 입고 한참을 바라보았어요. 매일 조금씩 표정이 선명해지는 게 느껴져요.",
+    image: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?q=80&w=1200&auto=format&fit=crop",
+    summary: ["목욕", "저녁", "성장"]
+  },
+  20: {
+    title: "발장구 1일차 기록",
+    text: "기저귀를 갈아주는데 발을 통통 움직이며 웃었어요. 작지만 확실한 움직임이 너무 귀여운 날이었어요.",
+    image: "https://images.unsplash.com/photo-1522771930-78848d9293e8?q=80&w=1200&auto=format&fit=crop",
+    summary: ["발장구", "움직임", "오늘"]
+  },
+  25: {
+    title: "가족에게 미소 선물",
+    text: "할머니와 영상 통화를 하다가 환하게 웃었어요. 화면 너머에서도 모두가 같이 웃게 된 따뜻한 순간이에요.",
+    image: "https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?q=80&w=1200&auto=format&fit=crop",
+    summary: ["가족", "미소", "공유"]
+  }
+};
+
+export function RecordsScreen({ route }: RecordsScreenProps) {
+  const [stories, setStories] = useState<Record<number, Story>>(initialStories);
+  const [selectedDate, setSelectedDate] = useState(todayDate);
+  const [storyOpen, setStoryOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftText, setDraftText] = useState("");
+  const [draftImageUri, setDraftImageUri] = useState<string | undefined>();
+  const processedCameraUri = useRef<string | undefined>(undefined);
+
+  const selectedStory = stories[selectedDate];
+
+  useEffect(() => {
+    const uri = route.params?.draftImageUri;
+    if (uri && processedCameraUri.current !== uri) {
+      processedCameraUri.current = uri;
+      setSelectedDate(todayDate);
+      setDraftImageUri(uri);
+      setDraftTitle("오늘의 사진 일기");
+      setDraftText("");
+      setEditorOpen(true);
+    }
+  }, [route.params?.draftImageUri]);
+
+  useEffect(() => {
+    Object.values(stories).forEach((story) => {
+      Image.prefetch(story.image);
+    });
+  }, [stories]);
+
+  const openStory = (date: number) => {
+    if (!stories[date]) return;
+    setSelectedDate(date);
+    setStoryOpen(true);
+  };
+
+  const openEditor = (imageUri?: string) => {
+    setDraftImageUri(imageUri);
+    setDraftTitle("");
+    setDraftText("");
+    setEditorOpen(true);
+  };
+
+  const closeEditor = () => {
+    Keyboard.dismiss();
+    setEditorOpen(false);
+  };
+
+  const pickPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.9
+    });
+
+    if (!result.canceled) {
+      setDraftImageUri(result.assets[0]?.uri);
+    }
+  };
+
+  const saveDiary = () => {
+    const image = draftImageUri ?? samplePhoto;
+    const title = draftTitle.trim() || "오늘의 성장 일기";
+    const text = draftText.trim() || "사진과 함께 남긴 오늘의 짧은 기록이에요.";
+
+    setStories((current) => ({
+      ...current,
+      [selectedDate]: {
+        title,
+        text,
+        image,
+        summary: ["일기", "사진", "오늘"]
+      }
+    }));
+    setEditorOpen(false);
+    setDraftTitle("");
+    setDraftText("");
+    setDraftImageUri(undefined);
+  };
+
   return (
     <View style={styles.root}>
-      <View style={styles.topNav}>
-        <View style={styles.backButton}>
-          <ChevronLeft color={colors.primaryDark} size={20} />
-        </View>
-        <Text style={styles.navTitle}>기록</Text>
-        <View style={styles.placeholder} />
-      </View>
-      <Screen>
-        <View>
-          <Text style={styles.month}>6월 2026</Text>
-          <View style={styles.dayRow}>
-            {days.map((day) => (
-              <View key={`${day.weekday}-${day.date}`} style={styles.dayItem}>
-                <Text style={styles.weekday}>{day.weekday}</Text>
-                <View style={styles.dateCircle}>
-                  <Text style={styles.dateText}>{day.date}</Text>
-                </View>
-                <View style={styles.dayDot} />
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <ImageBackground
-          source={{ uri: "https://images.unsplash.com/photo-1561640361-79ec50cf0cd3?q=80&w=1200&auto=format&fit=crop" }}
-          imageStyle={styles.diaryImage}
-          style={styles.diaryCard}
-        >
-          <View style={styles.diaryTop}>
-            <View style={styles.diaryBadge}>
-              <Text style={styles.diaryBadgeText}>생후 45일 · 6월 10일</Text>
+      {!editorOpen && (
+        <SafeAreaView edges={["top"]} style={styles.fixedArea}>
+          <View style={styles.topNav}>
+            <View style={styles.titleBlock}>
+              <Text style={styles.navEyebrow}>2026년 6월</Text>
+              <Text style={styles.navTitle}>성장 기록</Text>
             </View>
-            <View style={styles.aiBadge}>
-              <Sparkles color={colors.primary} size={13} />
-              <Text style={styles.aiBadgeText}>AI 요약</Text>
-            </View>
+            <Pressable style={styles.diaryButton} onPress={() => openEditor()}>
+              <PenLine color="#FFFFFF" size={15} />
+              <Text style={styles.diaryButtonText}>일기 쓰기</Text>
+            </Pressable>
           </View>
-        </ImageBackground>
-        <View style={styles.diarySummary}>
-          <Text style={styles.quote}>"오늘 새벽이는 잠도 잘 자고 방긋방긋 자주 웃었어요! 엄마 아빠와 눈맞춤이 늘어난 날. 🌸"</Text>
-          <View style={styles.summaryChips}>
-            {["🍼 수유 3회", "🌙 수면 5.5시간", "👶 배변 2회"].map((chip) => (
-              <Text key={chip} style={styles.summaryChip}>{chip}</Text>
-            ))}
-          </View>
-          <View style={styles.tagRow}>
-            {["#통잠성공", "#황금변", "#미소천사", "#눈맞춤증가"].map((tag) => (
-              <Text key={tag} style={styles.tagChip}>{tag}</Text>
-            ))}
-          </View>
-        </View>
 
-        <View>
-          <Text style={styles.sectionTitle}>오늘 타임라인</Text>
-          <View style={styles.timeline}>
-            {timeline.map((item) => (
-              <View key={`${item.title}-${item.time}`} style={styles.timelineRow}>
-                <View style={[styles.timelineDot, { backgroundColor: item.color === colors.blueSoft ? colors.primary : item.color === colors.greenSoft ? colors.success : colors.accent }]} />
-                <View style={[styles.timelineCard, { backgroundColor: item.color }]}>
-                  <View style={styles.timelineEmojiBox}>
-                    <Text style={styles.timelineEmoji}>{item.emoji}</Text>
-                  </View>
-                  <View style={styles.timelineText}>
-                    <View style={styles.timelineHeader}>
-                      <Text style={styles.timelineTitle}>{item.title}</Text>
-                      <Text style={styles.timelineTime}>{item.time}</Text>
-                    </View>
-                    <Text style={styles.timelineDetail}>{item.detail}</Text>
-                  </View>
+          <View style={styles.fixedContent}>
+            <View style={styles.calendarCard}>
+              <View style={styles.calendarHeader}>
+                <Text style={styles.monthTitle}>6월 기록 캘린더</Text>
+                <View style={styles.photoBadge}>
+                  <Camera color={colors.primary} size={14} />
+                  <Text style={styles.photoBadgeText}>사진 일기</Text>
                 </View>
               </View>
-            ))}
+
+              <View style={styles.weekRow}>
+                {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
+                  <Text key={day} style={styles.weekText}>{day}</Text>
+                ))}
+              </View>
+
+              <View style={styles.dateGrid}>
+                {calendarDays.map((date) => {
+                  const story = stories[date];
+                  const selected = selectedDate === date;
+
+                  return (
+                    <Pressable
+                      key={date}
+                      style={[styles.dateCell, selected && styles.dateCellActive]}
+                      onPress={() => {
+                        setSelectedDate(date);
+                        if (story) openStory(date);
+                      }}
+                    >
+                      {story ? (
+                        <ImageBackground
+                          fadeDuration={0}
+                          imageStyle={styles.dateThumbnailImage}
+                          source={{ uri: story.image }}
+                          style={styles.dateThumbnail}
+                        >
+                          <View style={[styles.dateOverlay, selected && styles.dateOverlayActive]}>
+                            <Text style={styles.thumbnailDateText}>{date}</Text>
+                          </View>
+                        </ImageBackground>
+                      ) : (
+                        <Text style={[styles.dateText, selected && styles.dateTextActive]}>{date}</Text>
+                      )}
+                    </Pressable>
+                  );
+                })}
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <View key={`dummy-${index}`} style={[styles.dateCell, styles.dummyCell]} />
+                ))}
+              </View>
+            </View>
+
+            <Pressable style={styles.previewCard} onPress={() => selectedStory ? openStory(selectedDate) : openEditor()}>
+              {selectedStory ? (
+                <ImageBackground imageStyle={styles.previewImage} source={{ uri: selectedStory.image }} style={styles.previewImageBox}>
+                  <View style={styles.previewOverlay}>
+                    <Text style={styles.previewDate}>6월 {selectedDate}일</Text>
+                    <Text style={styles.previewTitle}>{selectedStory.title}</Text>
+                    <Text numberOfLines={2} style={styles.previewText}>{selectedStory.text}</Text>
+                  </View>
+                </ImageBackground>
+              ) : (
+                <View style={styles.emptyStory}>
+                  <ImagePlus color={colors.primary} size={34} />
+                  <Text style={styles.emptyTitle}>이 날짜에 일기를 남겨보세요</Text>
+                  <Text style={styles.emptyText}>사진을 추가하면 캘린더 썸네일과 스토리에 바로 보여요.</Text>
+                </View>
+              )}
+            </Pressable>
           </View>
-        </View>
-      </Screen>
-      <View style={styles.chatButton}>
-        <MessageCircle color="#FFFFFF" size={18} />
-        <Text style={styles.chatText}>AI 챗봇</Text>
-      </View>
+        </SafeAreaView>
+      )}
+
+      {editorOpen && (
+        <SafeAreaView style={styles.fixedArea}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editorFlex}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+              <View style={styles.editorFlex}>
+                <View style={styles.editorHeader}>
+                  <Pressable hitSlop={12} style={styles.iconButton} onPress={closeEditor}>
+                    <X color={colors.primaryDark} size={24} />
+                  </Pressable>
+                  <Text style={styles.editorTitle}>일기 쓰기</Text>
+                  <Pressable style={styles.saveButton} onPress={saveDiary}>
+                    <Save color="#FFFFFF" size={15} />
+                    <Text style={styles.saveButtonText}>저장</Text>
+                  </Pressable>
+                </View>
+
+                <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.editorBody}>
+                  <Pressable style={styles.photoPicker} onPress={pickPhoto}>
+                    {draftImageUri ? (
+                      <Image source={{ uri: draftImageUri }} resizeMode="cover" style={styles.draftPhoto} />
+                    ) : (
+                      <View style={styles.photoEmpty}>
+                        <ImagePlus color={colors.primary} size={34} />
+                        <Text style={styles.photoEmptyText}>사진 추가하기</Text>
+                        <Text style={styles.photoEmptySubText}>내 갤러리에서 사진을 선택해요</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                  <TextInput
+                    value={draftTitle}
+                    onBlur={Keyboard.dismiss}
+                    onChangeText={setDraftTitle}
+                    placeholder="일기 제목"
+                    placeholderTextColor={colors.textMuted}
+                    returnKeyType="done"
+                    style={styles.titleInput}
+                  />
+                  <TextInput
+                    multiline
+                    blurOnSubmit
+                    onBlur={Keyboard.dismiss}
+                    onChangeText={setDraftText}
+                    placeholder="오늘의 순간을 적어보세요"
+                    placeholderTextColor={colors.textMuted}
+                    returnKeyType="done"
+                    style={styles.bodyInput}
+                    textAlignVertical="top"
+                    value={draftText}
+                  />
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      )}
+
+      <Modal animationType="fade" onRequestClose={() => setStoryOpen(false)} transparent visible={storyOpen}>
+        <StoryCarousel
+          dates={calendarDays.filter((date) => stories[date])}
+          initialDate={selectedDate}
+          onClose={() => setStoryOpen(false)}
+          stories={stories}
+        />
+      </Modal>
     </View>
   );
 }
@@ -111,228 +313,298 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     flex: 1
   },
+  fixedArea: {
+    backgroundColor: colors.background,
+    flex: 1
+  },
   topNav: {
     alignItems: "center",
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
     flexDirection: "row",
-    height: 56,
     justifyContent: "space-between",
-    paddingHorizontal: 16
+    paddingHorizontal: 20,
+    paddingTop: 8
   },
-  backButton: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
-    borderRadius: 999,
-    height: 36,
-    justifyContent: "center",
-    width: 36
+  titleBlock: {
+    gap: 3
+  },
+  navEyebrow: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "700"
   },
   navTitle: {
     color: colors.primaryDark,
-    fontSize: 17,
-    fontWeight: "900"
+    fontSize: 26,
+    fontWeight: "800"
   },
-  placeholder: {
-    width: 36
+  diaryButton: {
+    alignItems: "center",
+    backgroundColor: colors.accent,
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10
   },
-  month: {
-    color: colors.textMuted,
+  diaryButtonText: {
+    color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "800"
   },
-  dayRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 14
+  fixedContent: {
+    flex: 1,
+    gap: 14,
+    paddingBottom: 14,
+    paddingHorizontal: 20,
+    paddingTop: 14
   },
-  dayItem: {
+  calendarCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    borderRadius: 26,
+    borderWidth: 1,
+    padding: 14,
+    shadowColor: "#7A563B",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20
+  },
+  calendarHeader: {
     alignItems: "center",
-    gap: 6
-  },
-  weekday: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  dateCircle: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
-    borderRadius: 999,
-    height: 52,
-    justifyContent: "center",
-    width: 52
-  },
-  dateText: {
-    color: colors.primaryDark,
-    fontSize: 15,
-    fontWeight: "900"
-  },
-  dayDot: {
-    backgroundColor: colors.border,
-    borderRadius: 999,
-    height: 5,
-    width: 5
-  },
-  diaryCard: {
-    height: 180,
-    justifyContent: "flex-start"
-  },
-  diaryImage: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20
-  },
-  diaryTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: 14
+    marginBottom: 10
   },
-  diaryBadge: {
-    backgroundColor: "rgba(255,255,255,0.88)",
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7
+  monthTitle: {
+    color: colors.primaryDark,
+    fontSize: 18,
+    fontWeight: "800"
   },
-  diaryBadgeText: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  aiBadge: {
+  photoBadge: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.88)",
+    backgroundColor: colors.blueSoft,
     borderRadius: 999,
     flexDirection: "row",
     gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 7
-  },
-  aiBadgeText: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  diarySummary: {
-    backgroundColor: colors.surface,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    borderColor: colors.border,
-    borderTopWidth: 0,
-    borderWidth: 1,
-    marginTop: -20,
-    padding: 16
-  },
-  quote: {
-    color: colors.primaryDark,
-    fontSize: 15,
-    lineHeight: 24
-  },
-  summaryChips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 14
-  },
-  summaryChip: {
-    backgroundColor: colors.surfaceSoft,
-    borderRadius: 999,
-    color: colors.primaryDark,
-    fontSize: 12,
-    fontWeight: "900",
-    paddingHorizontal: 12,
-    paddingVertical: 8
-  },
-  tagRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 12
-  },
-  tagChip: {
-    backgroundColor: colors.blueSoft,
-    borderRadius: 999,
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: "800",
     paddingHorizontal: 10,
     paddingVertical: 6
   },
-  sectionTitle: {
+  photoBadgeText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  weekRow: {
+    flexDirection: "row",
+    marginBottom: 6
+  },
+  weekText: {
+    color: colors.textMuted,
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "800",
+    textAlign: "center"
+  },
+  dateGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap"
+  },
+  dateCell: {
+    alignItems: "center",
+    aspectRatio: 1,
+    borderRadius: 14,
+    justifyContent: "center",
+    margin: "0.75%",
+    overflow: "hidden",
+    width: "12.78%"
+  },
+  dateCellActive: {
+    backgroundColor: colors.blueSoft
+  },
+  dateText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  dateTextActive: {
+    color: colors.primary,
+    fontWeight: "900"
+  },
+  dateThumbnail: {
+    flex: 1,
+    width: "100%"
+  },
+  dateThumbnailImage: {
+    borderRadius: 14
+  },
+  dateOverlay: {
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.16)",
+    flex: 1,
+    justifyContent: "center"
+  },
+  dateOverlayActive: {
+    borderColor: colors.accent,
+    borderRadius: 14,
+    borderWidth: 2
+  },
+  thumbnailDateText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  dummyCell: {
+    backgroundColor: "transparent"
+  },
+  previewCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    borderRadius: 28,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 190,
+    overflow: "hidden"
+  },
+  previewImageBox: {
+    flex: 1
+  },
+  previewImage: {
+    borderRadius: 28
+  },
+  previewOverlay: {
+    backgroundColor: "rgba(0,0,0,0.28)",
+    flex: 1,
+    justifyContent: "flex-end",
+    padding: 18
+  },
+  previewDate: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  previewTitle: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 4
+  },
+  previewText: {
+    color: "rgba(255,255,255,0.86)",
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6
+  },
+  emptyStory: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    padding: 24
+  },
+  emptyTitle: {
+    color: colors.primaryDark,
+    fontSize: 18,
+    fontWeight: "900",
+    marginTop: 12
+  },
+  emptyText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 6,
+    textAlign: "center"
+  },
+  editorFlex: {
+    flex: 1
+  },
+  editorHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingVertical: 10
+  },
+  iconButton: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 999,
+    height: 42,
+    justifyContent: "center",
+    width: 42
+  },
+  editorTitle: {
     color: colors.primaryDark,
     fontSize: 18,
     fontWeight: "900"
   },
-  timeline: {
-    gap: 16,
-    marginTop: 14
-  },
-  timelineRow: {
-    flexDirection: "row",
-    gap: 16
-  },
-  timelineDot: {
+  saveButton: {
+    alignItems: "center",
+    backgroundColor: colors.primary,
     borderRadius: 999,
-    height: 12,
-    marginLeft: 14,
-    marginTop: 20,
-    width: 12
-  },
-  timelineCard: {
-    alignItems: "center",
-    borderRadius: 20,
-    flex: 1,
     flexDirection: "row",
-    gap: 12,
-    padding: 16
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 10
   },
-  timelineEmojiBox: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    height: 44,
-    justifyContent: "center",
-    width: 44
-  },
-  timelineEmoji: {
-    fontSize: 22
-  },
-  timelineText: {
-    flex: 1
-  },
-  timelineHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
-  timelineTitle: {
-    color: colors.primaryDark,
-    fontSize: 15,
+  saveButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
     fontWeight: "900"
   },
-  timelineTime: {
-    color: colors.textMuted,
-    fontSize: 11
+  editorBody: {
+    gap: 14,
+    paddingBottom: 32,
+    paddingHorizontal: 20,
+    paddingTop: 8
   },
-  timelineDetail: {
+  photoPicker: {
+    aspectRatio: 9 / 12,
+    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    borderRadius: 28,
+    borderStyle: "dashed",
+    borderWidth: 1,
+    overflow: "hidden"
+  },
+  draftPhoto: {
+    height: "100%",
+    width: "100%"
+  },
+  photoEmpty: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center"
+  },
+  photoEmptyText: {
+    color: colors.primaryDark,
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 10
+  },
+  photoEmptySubText: {
     color: colors.textMuted,
     fontSize: 13,
     marginTop: 4
   },
-  chatButton: {
-    alignItems: "center",
-    backgroundColor: colors.primary,
-    borderRadius: 999,
-    bottom: 18,
-    flexDirection: "row",
-    gap: 8,
+  titleInput: {
+    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: "800",
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    position: "absolute",
-    right: 16
+    paddingVertical: 14
   },
-  chatText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "900"
+  bodyInput: {
+    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 22,
+    minHeight: 150,
+    padding: 16
   }
 });

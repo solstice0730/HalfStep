@@ -1,0 +1,16 @@
+{
+  "name": "halfstep",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "npm --prefix frontend run start",
+    "start:clear": "npm --prefix frontend run start:clear",
+    "start:lan": "npm --prefix frontend run start:lan",
+    "start:tunnel": "npm --prefix frontend run start:tunnel",
+    "start:localhost": "npm --prefix frontend run start:localhost",
+    "android": "npm --prefix frontend run android",
+    "ios": "npm --prefix frontend run ios",
+    "web": "npm --prefix frontend run web",
+    "typecheck": "npm --prefix frontend run typecheck"
+  }
+}
