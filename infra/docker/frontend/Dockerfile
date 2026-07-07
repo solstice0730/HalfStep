@@ -13,4 +13,4 @@ RUN --mount=type=cache,target=/root/.npm \
 
 EXPOSE 8081
 
-CMD ["sh", "-c", "if [ -f package.json ]; then npm start -- --host lan; else echo 'frontend/package.json not found. Initialize React Native project first.'; tail -f /dev/null; fi"]
+CMD ["sh", "-c", "if [ -f package.json ]; then npm run web -- --host lan; else echo 'frontend/package.json not found. Initialize React Native project first.'; tail -f /dev/null; fi"]

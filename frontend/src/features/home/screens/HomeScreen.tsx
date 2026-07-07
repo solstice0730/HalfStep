@@ -4,6 +4,7 @@ import {
   Camera,
   ChevronDown,
   Flashlight,
+  LogOut,
   Send,
   Sparkles,
   X,
@@ -34,6 +35,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { colors } from "@/shared/constants/colors";
 
 const screenWidth = Dimensions.get("window").width;
@@ -99,6 +101,7 @@ function BabyMascot() {
 }
 
 export function HomeScreen({ navigation }: HomeScreenProps) {
+  const { signOut } = useAuth();
   const insets = useSafeAreaInsets();
   const pagerRef = useRef<ScrollView>(null);
   const cameraRef = useRef<CameraView>(null);
@@ -276,6 +279,9 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
             <ChevronDown color={colors.textMuted} size={18} />
           </Pressable>
           <View style={styles.headerActions}>
+            <Pressable accessibilityRole="button" accessibilityLabel="로그아웃" style={styles.logoutButton} onPress={signOut}>
+              <LogOut color={colors.primaryDark} size={19} />
+            </Pressable>
             <View style={styles.quickHeaderWrap}>
               <Pressable
                 accessibilityRole="button"
@@ -562,6 +568,16 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     gap: 8
+  },
+  logoutButton: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 46,
+    justifyContent: "center",
+    width: 46
   },
   mascotPanel: {
     flex: 1.15,
