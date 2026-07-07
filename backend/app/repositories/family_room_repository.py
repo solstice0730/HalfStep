@@ -95,12 +95,14 @@ def create_family_chat_message(
     *,
     room_id: int,
     user_id: int,
-    content: str,
+    content: str | None,
+    image_url: str | None = None,
 ) -> FamilyChatMessage:
     message = FamilyChatMessage(
         family_room_id=room_id,
         user_id=user_id,
         content=content,
+        image_url=image_url,
     )
     db.add(message)
     db.flush()

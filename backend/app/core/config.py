@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     KAKAO_CLIENT_SECRET: str = ""
     NAVER_CLIENT_ID: str = ""
     NAVER_CLIENT_SECRET: str = ""
+    UPLOAD_DIR: str = "uploads"
+    PUBLIC_BASE_URL: str = "http://localhost:8000"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

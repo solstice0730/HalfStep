@@ -1,7 +1,7 @@
 import secrets
 import string
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
@@ -31,6 +31,7 @@ from app.schemas.family_room import (
     FamilyRoomJoinResponse,
     FamilyRoomMemberResponse,
 )
+from app.services.file_storage import save_family_chat_image
 
 router = APIRouter(prefix="/family-rooms", tags=["family-rooms"])
 
@@ -172,6 +173,7 @@ def create_chat_message(
         room_id=room_id,
         user_id=current_user.id,
         content=payload.content,
+        image_url=None,
     )
     db.commit()
     db.refresh(message)
@@ -183,6 +185,45 @@ def create_chat_message(
             nickname=current_user.nickname,
         ),
         content=message.content,
+        imageUrl=message.image_url,
+        createdAt=message.created_at,
+    )
+    return {"success": True, "data": response.model_dump()}
+
+
+@router.post("/{room_id}/chat/image-messages", status_code=status.HTTP_201_CREATED)
+async def create_chat_image_message(
+    room_id: int,
+    content: str | None = Form(default=None, max_length=2000),
+    image: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    _ensure_room_member(db, room_id=room_id, user_id=current_user.id)
+
+    normalized_content = content.strip() if content is not None else None
+    if normalized_content == "":
+        normalized_content = None
+    image_url = await save_family_chat_image(room_id, image)
+
+    message = create_family_chat_message(
+        db,
+        room_id=room_id,
+        user_id=current_user.id,
+        content=normalized_content,
+        image_url=image_url,
+    )
+    db.commit()
+    db.refresh(message)
+
+    response = FamilyChatMessageResponse(
+        id=str(message.id),
+        author=FamilyChatAuthorResponse(
+            userId=str(current_user.id),
+            nickname=current_user.nickname,
+        ),
+        content=message.content,
+        imageUrl=message.image_url,
         createdAt=message.created_at,
     )
     return {"success": True, "data": response.model_dump()}
@@ -215,6 +256,7 @@ def get_chat_messages(
                 nickname=user.nickname,
             ),
             content=message.content,
+            imageUrl=message.image_url,
             createdAt=message.created_at,
         )
         for message, user in reversed(visible_rows)

@@ -53,7 +53,8 @@ class FamilyChatAuthorResponse(BaseModel):
 class FamilyChatMessageResponse(BaseModel):
     id: str
     author: FamilyChatAuthorResponse
-    content: str
+    content: str | None = None
+    imageUrl: str | None = None
     createdAt: datetime
 
 
