@@ -48,8 +48,6 @@ htmlcov/
 .venv/
 venv/
 backend/.venv/
-backend/alembic/versions/*.py
-!backend/alembic/versions/.gitkeep
 
 # React Native / mobile local files
 android/
