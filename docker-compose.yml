@@ -26,7 +26,7 @@ services:
     container_name: halfstep-backend
     restart: unless-stopped
     env_file:
-      - ./backend/.env.example
+      - ./backend/.env
     environment:
       DATABASE_URL: mysql+pymysql://halfstep:halfstep@mysql:3306/halfstep
     ports:
@@ -42,7 +42,7 @@ services:
     container_name: halfstep-frontend
     restart: unless-stopped
     env_file:
-      - ./frontend/.env.example
+      - ./frontend/.env
     ports:
       - "8081:8081"
     depends_on:
