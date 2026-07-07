@@ -39,3 +39,25 @@ class FamilyRoomDetailResponse(BaseModel):
     name: str
     inviteCode: str
     members: list[FamilyRoomMemberResponse]
+
+
+class FamilyChatMessageCreateRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class FamilyChatAuthorResponse(BaseModel):
+    userId: str
+    nickname: str | None = None
+
+
+class FamilyChatMessageResponse(BaseModel):
+    id: str
+    author: FamilyChatAuthorResponse
+    content: str
+    createdAt: datetime
+
+
+class FamilyChatMessagesResponse(BaseModel):
+    messages: list[FamilyChatMessageResponse]
+    nextCursor: str | None = None
+    hasNext: bool

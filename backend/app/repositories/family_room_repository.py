@@ -1,7 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.family_room import FamilyRoom, FamilyRoomMember
+from app.models.family_room import FamilyChatMessage, FamilyRoom, FamilyRoomMember
 from app.models.user import User
 
 
@@ -87,4 +87,41 @@ def list_family_room_members(db: Session, room_id: int) -> list[tuple[FamilyRoom
         .where(FamilyRoomMember.family_room_id == room_id)
         .order_by(FamilyRoomMember.joined_at.asc(), FamilyRoomMember.id.asc())
     )
+    return list(db.execute(statement).all())
+
+
+def create_family_chat_message(
+    db: Session,
+    *,
+    room_id: int,
+    user_id: int,
+    content: str,
+) -> FamilyChatMessage:
+    message = FamilyChatMessage(
+        family_room_id=room_id,
+        user_id=user_id,
+        content=content,
+    )
+    db.add(message)
+    db.flush()
+    return message
+
+
+def list_family_chat_messages(
+    db: Session,
+    *,
+    room_id: int,
+    cursor: int | None,
+    limit: int,
+) -> list[tuple[FamilyChatMessage, User]]:
+    statement = (
+        select(FamilyChatMessage, User)
+        .join(User, User.id == FamilyChatMessage.user_id)
+        .where(FamilyChatMessage.family_room_id == room_id)
+        .order_by(FamilyChatMessage.id.desc())
+        .limit(limit)
+    )
+    if cursor is not None:
+        statement = statement.where(FamilyChatMessage.id < cursor)
+
     return list(db.execute(statement).all())
