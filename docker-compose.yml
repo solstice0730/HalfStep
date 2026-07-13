@@ -29,6 +29,7 @@ services:
       - ./backend/.env
     environment:
       DATABASE_URL: ${DATABASE_URL:-mysql+pymysql://halfstep:halfstep@mysql:3306/halfstep}
+      OAUTH_DEV_TOKENS_ENABLED: ${OAUTH_DEV_TOKENS_ENABLED:-false}
     ports:
       - "8000:8000"
     depends_on:
