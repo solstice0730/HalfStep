@@ -9,11 +9,21 @@ from app.models.user import User
 from app.repositories import community_repository
 from app.schemas.community import CommunityPostCreate
 
+AGE_GROUPS = {
+    "M0_2": (0, 2),
+    "M3_5": (3, 5),
+    "M6_8": (6, 8),
+    "M9_11": (9, 11),
+    "M12_17": (12, 17),
+    "M18_24": (18, 24),
+}
+
 
 def list_community_posts(
     db: Session,
     *,
     category: str | None,
+    age_group: str | None,
     cursor: str | None,
     limit: int,
 ) -> tuple[list[CommunityPost], str | None, bool]:
@@ -21,10 +31,16 @@ def list_community_posts(
     if category_code and community_repository.get_category_by_code(db, category_code) is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid category.")
 
+    normalized_age_group = age_group.strip().upper() if age_group else None
+    if normalized_age_group and normalized_age_group not in {*AGE_GROUPS, "ALL_AGES"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid age group.")
+
     before_id = _decode_cursor(cursor) if cursor else None
     posts = community_repository.list_posts(
         db,
         category_code=category_code,
+        age_range=AGE_GROUPS.get(normalized_age_group),
+        age_independent=normalized_age_group == "ALL_AGES",
         before_id=before_id,
         limit=limit + 1,
     )
@@ -57,6 +73,7 @@ def create_community_post(
         title=payload.title,
         content=payload.content,
         image_urls=payload.imageUrls,
+        baby_age_months=payload.babyAgeMonths,
         is_anonymous=payload.isAnonymous,
     )
     db.commit()
@@ -77,7 +94,8 @@ def serialize_list_item(post: CommunityPost) -> dict:
     return {
         "id": str(post.id), "category": post.category.code, "title": post.title,
         "preview": preview, "author": serialize_author(post), "likeCount": 0,
-        "commentCount": 0, "imageCount": len(post.image_urls or []), "createdAt": post.created_at,
+        "babyAgeMonths": post.baby_age_months, "commentCount": 0,
+        "imageCount": len(post.image_urls or []), "createdAt": post.created_at,
     }
 
 

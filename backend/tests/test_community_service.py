@@ -32,7 +32,8 @@ class CommunityServiceTest(unittest.TestCase):
         return create_community_post(
             self.db,
             payload=CommunityPostCreate(
-                category="newborn", title=title, content="오늘은 조금 더 오래 잤어요."
+                category="newborn", title=title, content="오늘은 조금 더 오래 잤어요.",
+                babyAgeMonths=4,
             ),
             current_user=self.user,
         )
@@ -47,24 +48,40 @@ class CommunityServiceTest(unittest.TestCase):
         self.create_post("첫 번째 게시글")
         self.create_post("두 번째 게시글")
         posts, cursor, has_next = list_community_posts(
-            self.db, category="NEWBORN", cursor=None, limit=1
+            self.db, category="NEWBORN", age_group=None, cursor=None, limit=1
         )
         self.assertTrue(has_next)
         self.assertIsNotNone(cursor)
         self.assertEqual(posts[0].title, "두 번째 게시글")
         next_posts, _, next_has_next = list_community_posts(
-            self.db, category="NEWBORN", cursor=cursor, limit=1
+            self.db, category="NEWBORN", age_group=None, cursor=cursor, limit=1
         )
         self.assertFalse(next_has_next)
         self.assertEqual(next_posts[0].title, "첫 번째 게시글")
 
     def test_rejects_invalid_category_and_cursor(self) -> None:
         with self.assertRaises(HTTPException) as category_error:
-            list_community_posts(self.db, category="UNKNOWN", cursor=None, limit=20)
+            list_community_posts(self.db, category="UNKNOWN", age_group=None, cursor=None, limit=20)
         self.assertEqual(category_error.exception.status_code, 400)
         with self.assertRaises(HTTPException) as cursor_error:
-            list_community_posts(self.db, category=None, cursor="invalid", limit=20)
+            list_community_posts(self.db, category=None, age_group=None, cursor="invalid", limit=20)
         self.assertEqual(cursor_error.exception.status_code, 400)
+
+    def test_filters_posts_by_age_group(self) -> None:
+        self.create_post("4개월 게시글")
+        posts, _, _ = list_community_posts(
+            self.db, category=None, age_group="M3_5", cursor=None, limit=20
+        )
+        self.assertEqual([post.title for post in posts], ["4개월 게시글"])
+        empty, _, _ = list_community_posts(
+            self.db, category=None, age_group="M6_8", cursor=None, limit=20
+        )
+        self.assertEqual(empty, [])
+        with self.assertRaises(HTTPException) as error:
+            list_community_posts(
+                self.db, category=None, age_group="M25_30", cursor=None, limit=20
+            )
+        self.assertEqual(error.exception.status_code, 400)
 
     def test_missing_post_returns_not_found(self) -> None:
         with self.assertRaises(HTTPException) as error:

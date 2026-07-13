@@ -1433,7 +1433,7 @@ DELETE /family-rooms/{roomId}/members/{userId}
 ### 9.1 게시글 목록 조회
 
 ```
-GET /posts?category={category}
+GET /posts?category={category}&ageGroup={ageGroup}
 ```
 
 > 🔒 인증 필요
@@ -1443,6 +1443,7 @@ GET /posts?category={category}
 | 파라미터 | 필수 | 설명 |
 | --- | --- | --- |
 | `category` | X | `PREGNANCY` \| `BIRTH_STORY` \| `POSTPARTUM_CENTER` \| `NEWBORN` \| `FEEDING` \| `HEALTH` \| `SLEEP_DEVELOPMENT` \| `FREE` \| `COUNSELING` |
+| `ageGroup` | X | `M0_2` \| `M3_5` \| `M6_8` \| `M9_11` \| `M12_17` \| `M18_24` \| `ALL_AGES` |
 | `cursor` | X | 페이지네이션 커서 |
 | `limit` | X | 기본 20 |
 
@@ -1456,6 +1457,7 @@ GET /posts?category={category}
       "category": "NEWBORN",
       "title": "생후 45일 수면 패턴 공유해요",
       "preview": "저희 아기는 요즘...",
+      "babyAgeMonths": 4,
       "author": {
         "nickname": "익명",
         "isAnonymous": true
@@ -1492,6 +1494,7 @@ GET /posts/{postId}
     "category": "NEWBORN",
     "title": "생후 45일 수면 패턴 공유해요",
     "content": "저희 아기는 요즘...",
+    "babyAgeMonths": 4,
     "imageUrls": ["https://cdn.../image1.jpg"],
     "author": {
       "userId": "1",
@@ -1523,6 +1526,7 @@ POST /posts
   "category": "NEWBORN",
   "title": "생후 45일 수면 패턴 공유해요",
   "content": "저희 아기는 요즘...",
+  "babyAgeMonths": 4,
   "imageUrls": ["https://cdn.../image1.jpg"],  // 최대 5장
   "isAnonymous": false
 }

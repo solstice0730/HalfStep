@@ -28,6 +28,7 @@ class CommunityPost(Base):
     title: Mapped[str] = mapped_column(String(150))
     content: Mapped[str] = mapped_column(Text)
     image_urls: Mapped[list[str]] = mapped_column(JSON, default=list)
+    baby_age_months: Mapped[int] = mapped_column(Integer, nullable=True, index=True)
     is_anonymous: Mapped[bool] = mapped_column(Boolean, default=False)
     view_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -12,13 +12,14 @@ router = APIRouter(prefix="/posts", tags=["community"])
 @router.get("")
 def list_posts(
     category: str | None = None,
+    age_group: str | None = Query(default=None, alias="ageGroup"),
     cursor: str | None = None,
     limit: int = Query(default=20, ge=1, le=50),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> dict:
     posts, next_cursor, has_next = community_service.list_community_posts(
-        db, category=category, cursor=cursor, limit=limit
+        db, category=category, age_group=age_group, cursor=cursor, limit=limit
     )
     return {
         "success": True,

@@ -41,13 +41,16 @@ class CommunityMySqlIntegrationTest(unittest.TestCase):
                 "title": "MySQL 통합 테스트 게시글",
                 "content": "실제 MySQL에 저장하고 다시 조회합니다.",
                 "imageUrls": [],
+                "babyAgeMonths": 4,
                 "isAnonymous": False,
             },
         )
         self.assertEqual(created.status_code, 201)
         post_id = created.json()["data"]["id"]
 
-        listed = self.client.get("/api/posts", params={"category": "NEWBORN"})
+        listed = self.client.get(
+            "/api/posts", params={"category": "NEWBORN", "ageGroup": "M3_5"}
+        )
         self.assertEqual(listed.status_code, 200)
         self.assertIn(post_id, [post["id"] for post in listed.json()["data"]])
 

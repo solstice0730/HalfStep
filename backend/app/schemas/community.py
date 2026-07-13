@@ -8,6 +8,7 @@ class CommunityPostCreate(BaseModel):
     title: str = Field(min_length=2, max_length=150)
     content: str = Field(min_length=2, max_length=10000)
     imageUrls: list[str] = Field(default_factory=list, max_length=5)
+    babyAgeMonths: int | None = Field(default=None, ge=0, le=24)
     isAnonymous: bool = False
 
     @field_validator("category")
@@ -32,6 +33,7 @@ class CommunityPostListItem(BaseModel):
     category: str
     title: str
     preview: str
+    babyAgeMonths: int | None
     author: CommunityAuthor
     likeCount: int = 0
     commentCount: int = 0

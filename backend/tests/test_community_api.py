@@ -25,6 +25,7 @@ class CommunityApiTest(unittest.TestCase):
                 self.user,
                 CommunityCategory(code="NEWBORN", name="신생아", sort_order=10, is_active=True),
                 CommunityCategory(code="SLEEP_DEVELOPMENT", name="수면·발달", sort_order=20, is_active=True),
+                CommunityCategory(code="FREE", name="자유", sort_order=30, is_active=True),
             ]
         )
         self.db.commit()
@@ -37,7 +38,12 @@ class CommunityApiTest(unittest.TestCase):
         self.db.close()
         self.engine.dispose()
 
-    def create_post(self, category: str = "NEWBORN", title: str = "생후 45일 수면 기록"):
+    def create_post(
+        self,
+        category: str = "NEWBORN",
+        title: str = "생후 45일 수면 기록",
+        baby_age_months: int | None = 4,
+    ):
         return self.client.post(
             "/api/posts",
             json={
@@ -45,6 +51,7 @@ class CommunityApiTest(unittest.TestCase):
                 "title": title,
                 "content": "오늘은 평소보다 한 시간 더 오래 잤어요.",
                 "imageUrls": [],
+                "babyAgeMonths": baby_age_months,
                 "isAnonymous": False,
             },
         )
@@ -59,6 +66,7 @@ class CommunityApiTest(unittest.TestCase):
         body = listed.json()
         self.assertTrue(body["success"])
         self.assertEqual(body["data"][0]["id"], post_id)
+        self.assertEqual(body["data"][0]["babyAgeMonths"], 4)
         self.assertEqual(body["data"][0]["author"]["nickname"], "동준")
 
         detail = self.client.get(f"/api/posts/{post_id}")
@@ -85,6 +93,27 @@ class CommunityApiTest(unittest.TestCase):
         self.assertEqual(short_title.status_code, 422)
         self.assertEqual(self.client.get("/api/posts/999").status_code, 404)
         self.assertEqual(self.client.get("/api/posts", params={"cursor": "bad"}).status_code, 400)
+        self.assertEqual(self.create_post(baby_age_months=25).status_code, 422)
+        self.assertEqual(
+            self.client.get("/api/posts", params={"ageGroup": "M25_30"}).status_code,
+            400,
+        )
+
+    def test_age_group_and_category_can_be_combined(self) -> None:
+        matching = self.create_post("NEWBORN", "4개월 신생아 글", 4).json()["data"]["id"]
+        self.create_post("SLEEP_DEVELOPMENT", "8개월 수면 글", 8)
+        response = self.client.get(
+            "/api/posts", params={"category": "NEWBORN", "ageGroup": "M3_5"}
+        )
+        self.assertEqual([post["id"] for post in response.json()["data"]], [matching])
+
+    def test_all_ages_returns_age_independent_posts(self) -> None:
+        created = self.create_post("FREE", "월령 무관 글", None)
+        self.assertEqual(created.status_code, 201, created.text)
+        independent = created.json()["data"]["id"]
+        self.create_post("FREE", "4개월 글", 4)
+        response = self.client.get("/api/posts", params={"ageGroup": "ALL_AGES"})
+        self.assertEqual([post["id"] for post in response.json()["data"]], [independent])
 
     def test_authentication_is_required(self) -> None:
         app.dependency_overrides.pop(get_current_user)

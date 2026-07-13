@@ -17,6 +17,8 @@ def list_posts(
     db: Session,
     *,
     category_code: str | None,
+    age_range: tuple[int, int] | None,
+    age_independent: bool,
     before_id: int | None,
     limit: int,
 ) -> list[CommunityPost]:
@@ -30,6 +32,13 @@ def list_posts(
         statement = statement.join(CommunityPost.category).where(
             CommunityCategory.code == category_code,
             CommunityCategory.is_active.is_(True),
+        )
+    if age_independent:
+        statement = statement.where(CommunityPost.baby_age_months.is_(None))
+    elif age_range:
+        statement = statement.where(
+            CommunityPost.baby_age_months >= age_range[0],
+            CommunityPost.baby_age_months <= age_range[1],
         )
     if before_id is not None:
         statement = statement.where(CommunityPost.id < before_id)
@@ -53,6 +62,7 @@ def create_post(
     title: str,
     content: str,
     image_urls: list[str],
+    baby_age_months: int | None,
     is_anonymous: bool,
 ) -> CommunityPost:
     post = CommunityPost(
@@ -61,6 +71,7 @@ def create_post(
         title=title,
         content=content,
         image_urls=image_urls,
+        baby_age_months=baby_age_months,
         is_anonymous=is_anonymous,
     )
     db.add(post)

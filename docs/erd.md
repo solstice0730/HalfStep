@@ -553,6 +553,7 @@ UNIQUE(family_room_id, user_id)
 | title | VARCHAR | 제목 |
 | content | TEXT | 본문 |
 | image_urls | JSON | 첨부 이미지 URL 목록, 최대 5개 |
+| baby_age_months | SMALLINT | 작성 시점 아기 월령, 0~24개월, 월령 무관은 NULL |
 | is_anonymous | BOOLEAN | 익명 여부 |
 | view_count | INT | 조회수 |
 | created_at | DATETIME | 생성일 |
