@@ -564,6 +564,8 @@ UNIQUE(family_room_id, user_id)
 
 커뮤니티 댓글을 저장한다.
 
+> 현재 커뮤니티 MVP에서는 생성하지 않으며 댓글 기능 구현 시 migration을 추가한다.
+
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | id | BIGINT | 댓글 PK |
