@@ -519,6 +519,7 @@ UNIQUE(family_room_id, user_id)
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | id | BIGINT | 카테고리 PK |
+| code | VARCHAR | API에서 사용하는 고유 카테고리 코드 |
 | name | VARCHAR | 카테고리 이름 |
 | description | TEXT | 설명 |
 | sort_order | INT | 정렬 순서 |
@@ -551,6 +552,7 @@ UNIQUE(family_room_id, user_id)
 | user_id | BIGINT | 작성자 ID |
 | title | VARCHAR | 제목 |
 | content | TEXT | 본문 |
+| image_urls | JSON | 첨부 이미지 URL 목록, 최대 5개 |
 | is_anonymous | BOOLEAN | 익명 여부 |
 | view_count | INT | 조회수 |
 | created_at | DATETIME | 생성일 |
