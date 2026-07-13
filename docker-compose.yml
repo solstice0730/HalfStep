@@ -28,7 +28,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: mysql+pymysql://halfstep:halfstep@mysql:3306/halfstep
+      DATABASE_URL: ${DATABASE_URL:-mysql+pymysql://halfstep:halfstep@mysql:3306/halfstep}
     ports:
       - "8000:8000"
     depends_on:
