@@ -1,7 +1,7 @@
 import base64
 import binascii
 import json
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from app.models.user import User
 from app.repositories import records_repository
 
 LOG_TYPES = {"FEEDING", "SLEEP", "URINE", "STOOL"}
+APP_TIMEZONE = timezone(timedelta(hours=9), "Asia/Seoul")
 
 
 def require_baby_access(db: Session, baby_id: int, user: User) -> None:
@@ -21,6 +22,9 @@ def require_baby_access(db: Session, baby_id: int, user: User) -> None:
 def create_record(db: Session, *, user: User, log_type: str, values: dict) -> CareLog:
     baby_id = values.pop("baby_id")
     require_baby_access(db, baby_id, user)
+    for field in ("occurred_at", "started_at", "ended_at"):
+        if values.get(field) is not None:
+            values[field] = _to_utc_naive(values[field])
     log = records_repository.create_log(db, baby_id=baby_id, user_id=user.id, log_type=log_type, **values)
     db.commit()
     db.refresh(log)
@@ -32,11 +36,12 @@ def list_records(db: Session, *, user: User, baby_id: int, log_type: str | None,
     normalized_type = log_type.upper() if log_type else None
     if normalized_type and normalized_type not in LOG_TYPES:
         raise HTTPException(status_code=400, detail="Invalid record type.")
-    start_at = datetime.combine(target_date, time.min)
+    local_start = datetime.combine(target_date, time.min, tzinfo=APP_TIMEZONE)
+    start_at = _to_utc_naive(local_start)
     before_at, before_id = _decode_cursor(cursor) if cursor else (None, None)
     logs = records_repository.list_logs(
         db, baby_id=baby_id, log_type=normalized_type, start_at=start_at,
-        end_at=start_at + timedelta(days=1), before_at=before_at, before_id=before_id,
+        end_at=_to_utc_naive(local_start + timedelta(days=1)), before_at=before_at, before_id=before_id,
         limit=limit + 1,
     )
     has_next = len(logs) > limit
@@ -51,10 +56,26 @@ def serialize_log(log: CareLog) -> dict:
     if log.amount_ml is not None:
         content["formulaAmountMl"] = log.amount_ml
     return {
-        "id": str(log.id), "type": log.log_type, "occurredAt": log.occurred_at,
-        "startedAt": log.started_at, "endedAt": log.ended_at, "content": content,
-        "memo": log.memo, "createdAt": log.created_at,
+        "id": str(log.id), "type": log.log_type, "occurredAt": _to_app_timezone(log.occurred_at),
+        "startedAt": _to_app_timezone(log.started_at), "endedAt": _to_app_timezone(log.ended_at), "content": content,
+        "memo": log.memo, "createdAt": _to_app_timezone(log.created_at),
     }
+
+
+def current_date() -> date:
+    return datetime.now(APP_TIMEZONE).date()
+
+
+def _to_utc_naive(value: datetime) -> datetime:
+    aware = value if value.tzinfo is not None else value.replace(tzinfo=APP_TIMEZONE)
+    return aware.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _to_app_timezone(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    aware = value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+    return aware.astimezone(APP_TIMEZONE)
 
 
 def _encode_cursor(record: CareLog) -> str:

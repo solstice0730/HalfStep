@@ -66,12 +66,25 @@ class RecordsApiTest(unittest.TestCase):
         first = self.client.get(
             "/api/records", params={"babyId": self.baby.id, "date": "2026-07-15", "limit": 2}
         )
-        self.assertEqual([item["occurredAt"] for item in first.json()["data"]], ["2026-07-15T12:00:00", "2026-07-15T10:00:00"])
+        self.assertEqual([item["occurredAt"] for item in first.json()["data"]], ["2026-07-15T12:00:00+09:00", "2026-07-15T10:00:00+09:00"])
         cursor = first.json()["meta"]["cursor"]
         second = self.client.get(
             "/api/records", params={"babyId": self.baby.id, "date": "2026-07-15", "limit": 2, "cursor": cursor}
         )
-        self.assertEqual([item["occurredAt"] for item in second.json()["data"]], ["2026-07-15T08:00:00"])
+        self.assertEqual([item["occurredAt"] for item in second.json()["data"]], ["2026-07-15T08:00:00+09:00"])
+
+    def test_date_filter_uses_korean_calendar_day_for_offset_timestamp(self) -> None:
+        created = self.client.post(
+            "/api/records/urine",
+            json={"babyId": self.baby.id, "occurredAt": "2026-07-15T00:30:00+09:00"},
+        )
+        self.assertEqual(created.status_code, 201, created.text)
+        self.assertEqual(created.json()["data"]["occurredAt"], "2026-07-15T00:30:00+09:00")
+
+        selected_day = self.client.get("/api/records", params={"babyId": self.baby.id, "date": "2026-07-15"})
+        previous_day = self.client.get("/api/records", params={"babyId": self.baby.id, "date": "2026-07-14"})
+        self.assertEqual(len(selected_day.json()["data"]), 1)
+        self.assertEqual(previous_day.json()["data"], [])
 
     def test_rejects_inaccessible_baby_and_missing_auth(self) -> None:
         app.dependency_overrides[get_current_user] = lambda: self.other

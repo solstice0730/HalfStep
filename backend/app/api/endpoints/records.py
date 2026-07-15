@@ -15,7 +15,7 @@ router = APIRouter(prefix="/records", tags=["records"])
 def list_records(
     baby_id: int = Query(alias="babyId", gt=0),
     record_type: str | None = Query(default=None, alias="type"),
-    target_date: date = Query(default_factory=date.today, alias="date"),
+    target_date: date = Query(default_factory=records_service.current_date, alias="date"),
     cursor: str | None = None,
     limit: int = Query(default=50, ge=1, le=100),
     db: Session = Depends(get_db),
