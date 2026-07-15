@@ -1,5 +1,6 @@
 import base64
 import binascii
+import json
 from datetime import date, datetime, time, timedelta
 
 from fastapi import HTTPException, status
@@ -32,14 +33,15 @@ def list_records(db: Session, *, user: User, baby_id: int, log_type: str | None,
     if normalized_type and normalized_type not in LOG_TYPES:
         raise HTTPException(status_code=400, detail="Invalid record type.")
     start_at = datetime.combine(target_date, time.min)
+    before_at, before_id = _decode_cursor(cursor) if cursor else (None, None)
     logs = records_repository.list_logs(
         db, baby_id=baby_id, log_type=normalized_type, start_at=start_at,
-        end_at=start_at + timedelta(days=1), before_id=_decode_cursor(cursor) if cursor else None,
+        end_at=start_at + timedelta(days=1), before_at=before_at, before_id=before_id,
         limit=limit + 1,
     )
     has_next = len(logs) > limit
     page = logs[:limit]
-    return page, (_encode_cursor(page[-1].id) if has_next and page else None), has_next
+    return page, (_encode_cursor(page[-1]) if has_next and page else None), has_next
 
 
 def serialize_log(log: CareLog) -> dict:
@@ -55,16 +57,19 @@ def serialize_log(log: CareLog) -> dict:
     }
 
 
-def _encode_cursor(record_id: int) -> str:
-    return base64.urlsafe_b64encode(f"record:{record_id}".encode()).decode().rstrip("=")
+def _encode_cursor(record: CareLog) -> str:
+    payload = json.dumps({"occurredAt": record.occurred_at.isoformat(), "id": record.id}, separators=(",", ":"))
+    return base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
 
 
-def _decode_cursor(cursor: str) -> int:
+def _decode_cursor(cursor: str) -> tuple[datetime, int]:
     try:
         value = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)).decode()
-        prefix, raw_id = value.split(":", 1)
-        if prefix != "record" or int(raw_id) < 1:
+        payload = json.loads(value)
+        record_id = int(payload["id"])
+        occurred_at = datetime.fromisoformat(payload["occurredAt"])
+        if record_id < 1:
             raise ValueError
-        return int(raw_id)
-    except (ValueError, UnicodeDecodeError, binascii.Error) as exc:
+        return occurred_at, record_id
+    except (KeyError, TypeError, ValueError, UnicodeDecodeError, binascii.Error, json.JSONDecodeError) as exc:
         raise HTTPException(status_code=400, detail="Invalid cursor.") from exc

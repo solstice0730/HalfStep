@@ -55,6 +55,24 @@ class RecordsApiTest(unittest.TestCase):
         invalid = self.client.post("/api/records/feeding", json={"babyId": self.baby.id, "occurredAt": "2026-07-15T09:00:00", "feedingType": "FORMULA"})
         self.assertEqual(invalid.status_code, 422)
 
+    def test_cursor_follows_occurrence_order_for_backdated_records(self) -> None:
+        for occurred_at in ("2026-07-15T12:00:00", "2026-07-15T08:00:00", "2026-07-15T10:00:00"):
+            response = self.client.post(
+                "/api/records/urine",
+                json={"babyId": self.baby.id, "occurredAt": occurred_at},
+            )
+            self.assertEqual(response.status_code, 201, response.text)
+
+        first = self.client.get(
+            "/api/records", params={"babyId": self.baby.id, "date": "2026-07-15", "limit": 2}
+        )
+        self.assertEqual([item["occurredAt"] for item in first.json()["data"]], ["2026-07-15T12:00:00", "2026-07-15T10:00:00"])
+        cursor = first.json()["meta"]["cursor"]
+        second = self.client.get(
+            "/api/records", params={"babyId": self.baby.id, "date": "2026-07-15", "limit": 2, "cursor": cursor}
+        )
+        self.assertEqual([item["occurredAt"] for item in second.json()["data"]], ["2026-07-15T08:00:00"])
+
     def test_rejects_inaccessible_baby_and_missing_auth(self) -> None:
         app.dependency_overrides[get_current_user] = lambda: self.other
         forbidden = self.client.get("/api/records", params={"babyId": self.baby.id})

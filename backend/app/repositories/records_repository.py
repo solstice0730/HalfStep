@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.records import Baby, BabyCaregiver, CareLog
@@ -29,6 +29,7 @@ def list_logs(
     log_type: str | None,
     start_at: datetime,
     end_at: datetime,
+    before_at: datetime | None,
     before_id: int | None,
     limit: int,
 ) -> list[CareLog]:
@@ -40,6 +41,11 @@ def list_logs(
     )
     if log_type:
         statement = statement.where(CareLog.log_type == log_type)
-    if before_id:
-        statement = statement.where(CareLog.id < before_id)
+    if before_at is not None and before_id is not None:
+        statement = statement.where(
+            or_(
+                CareLog.occurred_at < before_at,
+                and_(CareLog.occurred_at == before_at, CareLog.id < before_id),
+            )
+        )
     return list(db.scalars(statement).all())
