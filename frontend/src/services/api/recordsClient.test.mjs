@@ -7,6 +7,7 @@ import {
   buildFeedingRecord,
   buildSleepRecord
 } from "../../features/home/utils/quickRecordPayloads.ts";
+import { describeRecord, formatRecordDate } from "../../features/records/utils/recordPresentation.ts";
 
 function recordingFetch(responseBody, status = 200) {
   const calls = [];
@@ -91,4 +92,27 @@ test("quick diaper keeps the selected urine or stool type", () => {
     type: "STOOL",
     body: { babyId: 1, occurredAt: occurredAt.toISOString() }
   });
+});
+
+test("record date uses a local calendar date", () => {
+  assert.equal(formatRecordDate(2026, 6, 5), "2026-07-05");
+});
+
+test("record descriptions expose the important value for every type", () => {
+  assert.equal(describeRecord({
+    id: "1", type: "FEEDING", occurredAt: "2026-07-15T09:00:00", startedAt: null, endedAt: null,
+    content: { feedingType: "FORMULA", formulaAmountMl: 120 }, memo: null, createdAt: "2026-07-15T09:00:00"
+  }), "분유 120ml");
+  assert.equal(describeRecord({
+    id: "2", type: "SLEEP", occurredAt: "2026-07-15T11:30:00", startedAt: "2026-07-15T10:00:00",
+    endedAt: "2026-07-15T11:30:00", content: {}, memo: null, createdAt: "2026-07-15T11:30:00"
+  }), "수면 1시간 30분");
+  assert.equal(describeRecord({
+    id: "3", type: "URINE", occurredAt: "2026-07-15T12:00:00", startedAt: null, endedAt: null,
+    content: { amount: "MEDIUM", color: "NORMAL" }, memo: null, createdAt: "2026-07-15T12:00:00"
+  }), "소변 · 보통 · 정상");
+  assert.equal(describeRecord({
+    id: "4", type: "STOOL", occurredAt: "2026-07-15T13:00:00", startedAt: null, endedAt: null,
+    content: { amount: "SMALL", color: "GREEN", form: "SOFT" }, memo: null, createdAt: "2026-07-15T13:00:00"
+  }), "대변 · 적음 · 초록 · 무른 변");
 });
