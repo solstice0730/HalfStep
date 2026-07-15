@@ -1,7 +1,7 @@
 from collections.abc import Generator
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
@@ -11,7 +11,7 @@ from app.models.user import User
 from app.repositories.user_repository import get_user_by_id
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_PREFIX}/auth/social")
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -23,7 +23,7 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     credentials_error = HTTPException(
@@ -31,9 +31,12 @@ def get_current_user(
         detail="Could not validate credentials.",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if credentials is None:
+        raise credentials_error
+
     try:
         payload = jwt.decode(
-            token,
+            credentials.credentials,
             settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM],
         )

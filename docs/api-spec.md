@@ -510,7 +510,7 @@ GET /records?babyId={babyId}&type={type}&date={date}
 | 파라미터 | 필수 | 타입 | 설명 |
 | --- | --- | --- | --- |
 | `babyId` | O | string | 아기 ID |
-| `type` | X | string | `FEEDING` \| `SLEEP` \| `URINE` \| `STOOL` \| `MEAL` \| `DIARY` |
+| `type` | X | string | `FEEDING` \| `SLEEP` \| `URINE` \| `STOOL` |
 | `date` | X | string | 조회 날짜 (`YYYY-MM-DD`). 미입력 시 오늘 |
 | `cursor` | X | string | 페이지네이션 커서 |
 | `limit` | X | number | 기본 50 |
@@ -555,12 +555,13 @@ POST /records/feeding
 ```json
 {
   "babyId": "uuid",
-  "startedAt": "2025-05-15T09:00:00Z",
-  "endedAt": "2025-05-15T09:20:00Z",
-  "feedingType": "BREAST",         // "BREAST" | "FORMULA" | "MIXED"
-  "breastSide": "LEFT",            // feedingType이 BREAST일 때: "LEFT" | "RIGHT" | "BOTH"
-  "formulaAmountMl": null,         // feedingType이 FORMULA/MIXED일 때 입력
-  "memo": "string"                 // 선택
+  "occurredAt": "2025-05-15T09:00:00Z",
+  "feedingType": "BREAST",
+  "amountMl": null,
+  "durationMinutes": 20,
+  "breastSide": "LEFT",
+  "burped": true,
+  "memo": "잘 먹었음"
 }
 ```
 
@@ -571,8 +572,7 @@ POST /records/feeding
   "data": {
     "id": "uuid",
     "type": "FEEDING",
-    "startedAt": "2025-05-15T09:00:00Z",
-    "endedAt": "2025-05-15T09:20:00Z",
+    "occurredAt": "2025-05-15T09:00:00Z",
     "durationMinutes": 20
   }
 }
@@ -656,7 +656,8 @@ POST /records/sleep
   "babyId": "uuid",
   "startedAt": "2025-05-15T11:00:00Z",
   "endedAt": "2025-05-15T13:30:00Z",
-  "memo": "string"
+  "sleepType": "NAP",
+  "status": "PEACEFUL"
 }
 ```
 
@@ -700,8 +701,8 @@ POST /records/urine
 {
   "babyId": "uuid",
   "occurredAt": "2025-05-15T10:00:00Z",
-  "color": "NORMAL",               // "NORMAL" | "DARK_YELLOW" | "PINK" | "RED" | "OTHER"
-  "memo": "string"
+  "amount": "MEDIUM",
+  "color": "NORMAL"
 }
 ```
 
@@ -733,9 +734,10 @@ POST /records/stool
 {
   "babyId": "uuid",
   "occurredAt": "2025-05-15T10:00:00Z",
-  "color": "NORMAL",               // "NORMAL" | "GREEN" | "BLACK" | "RED" | "WHITE" | "OTHER"
-  "bristolType": 4,                // 브리스틀 대변 척도 1~7
-  "memo": "string"
+  "amount": "SMALL",
+  "color": "GREEN",
+  "form": "SOFT",
+  "photoUrl": "https://cdn.../stool.jpg"
 }
 ```
 

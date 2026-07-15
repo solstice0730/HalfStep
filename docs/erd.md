@@ -346,7 +346,7 @@ UNIQUE(baby_id, user_id)
 | diaper_type | VARCHAR | 소변, 대변 상태 |
 | baby_food_name | VARCHAR | 이유식 이름 |
 | memo | TEXT | 메모 |
-| extra_data | JSON | 추가 데이터 |
+| extra_data | JSON | 수유 시간·좌우·트림, 수면 종류·상태, 배뇨/배변 양·색상·형태·사진 URL |
 | created_at | DATETIME | 생성일 |
 | updated_at | DATETIME | 수정일 |
 
@@ -359,6 +359,15 @@ URINE
 STOOL
 BABY_FOOD
 ```
+
+MVP 입력 규칙:
+
+| 기록 | 필수 입력 | 선택 입력 |
+| --- | --- | --- |
+| 수유 | 시간, 방식, 수유량 또는 수유 시간 | 좌우, 트림, 메모 |
+| 수면 | 시작 시간, 종료 시간 | 낮잠/밤잠, 상태 |
+| 소변 | 시간 | 양, 색상 |
+| 대변 | 시간 | 양, 색상, 형태, 사진 URL |
 
 ---
 
