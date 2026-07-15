@@ -1,10 +1,20 @@
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models.records import Baby, CareLog
+from app.models.records import Baby, BabyCaregiver, CareLog
 from app.models.user import User
+
+
+def ensure_demo_caregivers(db: Session, baby: Baby) -> None:
+    user_ids = set(db.scalars(select(User.id).where(User.id != baby.owner_user_id)).all())
+    existing_ids = set(
+        db.scalars(select(BabyCaregiver.user_id).where(BabyCaregiver.baby_id == baby.id)).all()
+    )
+    for user_id in sorted(user_ids - existing_ids):
+        db.add(BabyCaregiver(baby_id=baby.id, user_id=user_id, role="CAREGIVER", relation="DEMO"))
 
 
 def main() -> None:
@@ -20,6 +30,7 @@ def main() -> None:
             baby = Baby(owner_user_id=user.id, name="리몽", birth_date=date.today() - timedelta(days=45), gender="UNKNOWN")
             db.add(baby)
             db.flush()
+        ensure_demo_caregivers(db, baby)
         if db.scalar(select(CareLog.id).where(CareLog.baby_id == baby.id).limit(1)) is None:
             now = datetime.now().replace(microsecond=0)
             db.add_all([
