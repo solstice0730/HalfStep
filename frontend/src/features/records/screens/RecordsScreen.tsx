@@ -1,127 +1,705 @@
+import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import * as ImagePicker from "expo-image-picker";
-import { Baby, BedDouble, Camera, Droplets, Milk, Plus, RefreshCw, X } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Camera, ImagePlus, PenLine, Save, X } from "lucide-react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Animated,
+  Dimensions,
+  Image,
+  ImageBackground,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  PanResponder,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableWithoutFeedback,
+  View
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { env } from "@/config/env";
-import { useAuth } from "@/features/auth/hooks/useAuth";
-import type { CareRecord, RecordCreateBody, RecordType } from "@/features/records/types/records";
-import { createRecord, listRecords } from "@/services/api/recordsApi";
+import { StoryCarousel } from "../components/DiaryCarousel";
+import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { colors } from "@/shared/constants/colors";
 
-const recordTypes: Array<{ type: RecordType; label: string }> = [
-  { type: "FEEDING", label: "수유" }, { type: "SLEEP", label: "수면" },
-  { type: "URINE", label: "소변" }, { type: "STOOL", label: "대변" }
-];
+type RecordsScreenProps = BottomTabScreenProps<MainTabParamList, "Records">;
 
-const today = () => new Date().toISOString().slice(0, 10);
-const nowIso = () => new Date().toISOString();
+export type Story = {
+  title: string;
+  text: string;
+  image: string;
+  summary: string[];
+};
 
-export function RecordsScreen() {
-  const { accessToken } = useAuth();
-  const [records, setRecords] = useState<CareRecord[]>([]);
-  const [filter, setFilter] = useState<RecordType | undefined>();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [editor, setEditor] = useState<RecordType | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [duration, setDuration] = useState("");
-  const [memo, setMemo] = useState("");
-  const [photos, setPhotos] = useState<string[]>([]);
+const calendarDays = Array.from({ length: 30 }, (_, index) => index + 1);
+const screenWidth = Dimensions.get("window").width;
+const todayDate = 20;
+const samplePhoto = "https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1200&auto=format&fit=crop";
 
-  const load = useCallback(async () => {
-    if (!accessToken) return;
-    setLoading(true); setError(null);
-    try { setRecords(await listRecords(accessToken, env.demoBabyId, today(), filter)); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "기록을 불러오지 못했습니다."); }
-    finally { setLoading(false); }
-  }, [accessToken, filter]);
+const initialStories: Record<number, Story> = {
+  5: {
+    title: "처음 길게 웃어준 날",
+    text: "아침 수유 후 눈을 맞추자 오래 웃어줬어요. 짧은 순간이었지만 하루 종일 마음에 남는 장면이었어요.",
+    image: "https://images.unsplash.com/photo-1442458370899-ae20e367c5d8?q=80&w=1200&auto=format&fit=crop",
+    summary: ["웃음", "수유", "가족"]
+  },
+  10: {
+    title: "햇살 아래 낮잠",
+    text: "창가에 들어온 햇살을 받으며 편안하게 잠들었어요. 방 안이 조용하고 따뜻해서 사진으로 꼭 남기고 싶었어요.",
+    image: "https://images.unsplash.com/photo-1561640361-79ec50cf0cd3?q=80&w=1200&auto=format&fit=crop",
+    summary: ["낮잠", "햇살", "평온"]
+  },
+  15: {
+    title: "목욕하고 뽀송한 저녁",
+    text: "목욕 뒤 보송한 옷을 입고 한참을 바라보았어요. 매일 조금씩 표정이 선명해지는 게 느껴져요.",
+    image: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?q=80&w=1200&auto=format&fit=crop",
+    summary: ["목욕", "저녁", "성장"]
+  },
+  20: {
+    title: "발장구 1일차 기록",
+    text: "기저귀를 갈아주는데 발을 통통 움직이며 웃었어요. 작지만 확실한 움직임이 너무 귀여운 날이었어요.",
+    image: "https://images.unsplash.com/photo-1522771930-78848d9293e8?q=80&w=1200&auto=format&fit=crop",
+    summary: ["발장구", "움직임", "오늘"]
+  },
+  25: {
+    title: "가족에게 미소 선물",
+    text: "할머니와 영상 통화를 하다가 환하게 웃었어요. 화면 너머에서도 모두가 같이 웃게 된 따뜻한 순간이에요.",
+    image: "https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?q=80&w=1200&auto=format&fit=crop",
+    summary: ["가족", "미소", "공유"]
+  }
+};
 
-  useEffect(() => { load(); }, [load]);
+export function RecordsScreen({ route }: RecordsScreenProps) {
+  const [stories, setStories] = useState<Record<number, Story>>(initialStories);
+  const [selectedDate, setSelectedDate] = useState(todayDate);
+  const [storyOpen, setStoryOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftText, setDraftText] = useState("");
+  const [draftImageUri, setDraftImageUri] = useState<string | undefined>();
+  const processedCameraUri = useRef<string | undefined>(undefined);
+  const previewTranslateX = useRef(new Animated.Value(0)).current;
 
-  const summary = useMemo(() => ({
-    FEEDING: records.filter((item) => item.type === "FEEDING").length,
-    SLEEP: records.filter((item) => item.type === "SLEEP").length,
-    URINE: records.filter((item) => item.type === "URINE").length,
-    STOOL: records.filter((item) => item.type === "STOOL").length
-  }), [records]);
+  const selectedStory = stories[selectedDate];
+  const storyDates = useMemo(() => calendarDays.filter((date) => stories[date]), [stories]);
 
-  const save = async () => {
-    if (!accessToken || !editor) return;
-    setSaving(true); setError(null);
-    const current = new Date();
-    const base = { babyId: env.demoBabyId };
-    let body: RecordCreateBody;
-    if (editor === "FEEDING") {
-      body = { ...base, occurredAt: nowIso(), feedingType: amount ? "FORMULA" : "BREAST",
-        amountMl: amount ? Number(amount) : undefined, durationMinutes: duration ? Number(duration) : undefined,
-        breastSide: amount ? undefined : "BOTH", burped: null, memo: memo || null };
-    } else if (editor === "SLEEP") {
-      body = { ...base, startedAt: new Date(current.getTime() - Math.max(1, Number(duration) || 60) * 60000).toISOString(),
-        endedAt: current.toISOString(), sleepType: "NAP", status: null };
-    } else if (editor === "URINE") {
-      body = { ...base, occurredAt: nowIso(), amount: "MEDIUM", color: "NORMAL" };
-    } else {
-      body = { ...base, occurredAt: nowIso(), amount: "MEDIUM", color: "NORMAL", form: "NORMAL", photoUrl: null };
+  useEffect(() => {
+    const uri = route.params?.draftImageUri;
+    if (uri && processedCameraUri.current !== uri) {
+      processedCameraUri.current = uri;
+      setSelectedDate(todayDate);
+      setDraftImageUri(uri);
+      setDraftTitle("오늘의 사진 일기");
+      setDraftText("");
+      setEditorOpen(true);
     }
-    try {
-      await createRecord(accessToken, editor, body);
-      setEditor(null); setAmount(""); setDuration(""); setMemo(""); await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "기록 저장에 실패했습니다."); }
-    finally { setSaving(false); }
+  }, [route.params?.draftImageUri]);
+
+  useEffect(() => {
+    Object.values(stories).forEach((story) => {
+      Image.prefetch(story.image);
+    });
+  }, [stories]);
+
+  const openStory = (date: number) => {
+    if (!stories[date]) return;
+    setSelectedDate(date);
+    setStoryOpen(true);
+  };
+
+  const openEditor = (imageUri?: string) => {
+    setDraftImageUri(imageUri);
+    setDraftTitle("");
+    setDraftText("");
+    setEditorOpen(true);
+  };
+
+  const snapPreviewToDate = (direction: -1 | 1) => {
+    if (storyDates.length <= 1) {
+      Animated.spring(previewTranslateX, {
+        friction: 9,
+        tension: 80,
+        toValue: 0,
+        useNativeDriver: true
+      }).start();
+      return;
+    }
+
+    const currentIndex = storyDates.includes(selectedDate)
+      ? storyDates.indexOf(selectedDate)
+      : storyDates.findIndex((date) => date > selectedDate);
+    const safeIndex = currentIndex === -1 ? storyDates.length - 1 : currentIndex;
+    const nextIndex = Math.max(0, Math.min(storyDates.length - 1, safeIndex + direction));
+
+    if (nextIndex === safeIndex) {
+      Animated.spring(previewTranslateX, {
+        friction: 9,
+        tension: 80,
+        toValue: 0,
+        useNativeDriver: true
+      }).start();
+      return;
+    }
+
+    Animated.timing(previewTranslateX, {
+      duration: 140,
+      toValue: -direction * screenWidth,
+      useNativeDriver: true
+    }).start(() => {
+      setSelectedDate(storyDates[nextIndex]);
+      previewTranslateX.setValue(direction * screenWidth);
+      Animated.spring(previewTranslateX, {
+        friction: 9,
+        tension: 74,
+        toValue: 0,
+        useNativeDriver: true
+      }).start();
+    });
+  };
+
+  const previewPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onPanResponderGrant: () => {
+          previewTranslateX.stopAnimation();
+        },
+        onPanResponderMove: (_, gesture) => {
+          previewTranslateX.setValue(gesture.dx);
+        },
+        onPanResponderRelease: (_, gesture) => {
+          const threshold = screenWidth * 0.18;
+          if (Math.abs(gesture.dx) > threshold || Math.abs(gesture.vx) > 0.55) {
+            snapPreviewToDate(gesture.dx < 0 ? 1 : -1);
+            return;
+          }
+
+          Animated.spring(previewTranslateX, {
+            friction: 9,
+            tension: 80,
+            toValue: 0,
+            useNativeDriver: true
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(previewTranslateX, {
+            friction: 9,
+            tension: 80,
+            toValue: 0,
+            useNativeDriver: true
+          }).start();
+        }
+      }),
+    [previewTranslateX, selectedDate, storyDates]
+  );
+
+  const closeEditor = () => {
+    Keyboard.dismiss();
+    setEditorOpen(false);
   };
 
   const pickPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) return;
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: true, selectionLimit: 5 });
-    if (!result.canceled) setPhotos(result.assets.map((asset) => asset.uri).slice(0, 5));
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.9
+    });
+
+    if (!result.canceled) {
+      setDraftImageUri(result.assets[0]?.uri);
+    }
+  };
+
+  const saveDiary = () => {
+    const image = draftImageUri ?? samplePhoto;
+    const title = draftTitle.trim() || "오늘의 성장 일기";
+    const text = draftText.trim() || "사진과 함께 남긴 오늘의 짧은 기록이에요.";
+
+    setStories((current) => ({
+      ...current,
+      [selectedDate]: {
+        title,
+        text,
+        image,
+        summary: ["일기", "사진", "오늘"]
+      }
+    }));
+    setEditorOpen(false);
+    setDraftTitle("");
+    setDraftText("");
+    setDraftImageUri(undefined);
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <View><Text style={styles.eyebrow}>{today()}</Text><Text style={styles.title}>오늘의 기록</Text></View>
-          <Pressable accessibilityLabel="기록 새로고침" style={styles.iconButton} onPress={load}><RefreshCw color={colors.primary} size={20} /></Pressable>
-        </View>
+    <View style={styles.root}>
+      {!editorOpen && (
+        <SafeAreaView edges={["top"]} style={styles.fixedArea}>
+          <View style={styles.topNav}>
+            <View style={styles.titleBlock}>
+              <Text style={styles.navEyebrow}>2026년 6월</Text>
+              <Text style={styles.navTitle}>성장 기록</Text>
+            </View>
+            <Pressable style={styles.diaryButton} onPress={() => openEditor()}>
+              <PenLine color="#FFFFFF" size={15} />
+              <Text style={styles.diaryButtonText}>일기 쓰기</Text>
+            </Pressable>
+          </View>
 
-        <View style={styles.summaryRow}>
-          {recordTypes.map(({ type, label }) => <Pressable key={type} style={[styles.summaryItem, filter === type && styles.summaryActive]} onPress={() => setFilter(filter === type ? undefined : type)}><Text style={styles.summaryCount}>{summary[type]}</Text><Text style={styles.summaryLabel}>{label}</Text></Pressable>)}
-        </View>
+          <View style={styles.fixedContent}>
+            <View style={styles.calendarCard}>
+              <View style={styles.calendarHeader}>
+                <Text style={styles.monthTitle}>6월 기록 캘린더</Text>
+                <View style={styles.photoBadge}>
+                  <Camera color={colors.primary} size={14} />
+                  <Text style={styles.photoBadgeText}>사진 일기</Text>
+                </View>
+              </View>
 
-        <View style={styles.quickRow}>
-          {recordTypes.map(({ type, label }) => <Pressable key={type} style={styles.quickButton} onPress={() => setEditor(type)}>{type === "FEEDING" ? <Milk color={colors.primary} size={20} /> : type === "SLEEP" ? <BedDouble color={colors.primary} size={20} /> : type === "URINE" ? <Droplets color={colors.primary} size={20} /> : <Baby color={colors.primary} size={20} />}<Text style={styles.quickText}>{label}</Text><Plus color={colors.textMuted} size={15} /></Pressable>)}
-        </View>
+              <View style={styles.weekRow}>
+                {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
+                  <Text key={day} style={styles.weekText}>{day}</Text>
+                ))}
+              </View>
 
-        <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>기록 타임라인</Text>{filter && <Text style={styles.filterText}>{recordTypes.find((item) => item.type === filter)?.label}</Text>}</View>
-        {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary} /><Text style={styles.stateText}>기록을 불러오는 중입니다.</Text></View> : error ? <View style={styles.state}><Text style={styles.errorText}>{error}</Text><Pressable style={styles.retry} onPress={load}><Text style={styles.retryText}>다시 시도</Text></Pressable></View> : records.length === 0 ? <View style={styles.state}><Text style={styles.emptyTitle}>아직 기록이 없습니다</Text><Text style={styles.stateText}>위 버튼으로 첫 기록을 남겨보세요.</Text></View> : <View style={styles.timeline}>{records.map((record) => <View key={record.id} style={styles.recordRow}><View style={styles.dot} /><View style={styles.recordBody}><Text style={styles.recordTitle}>{recordTypes.find((item) => item.type === record.type)?.label}</Text><Text style={styles.recordTime}>{new Date(record.occurredAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</Text><Text style={styles.recordDetail}>{formatRecord(record)}</Text></View></View>)}</View>}
+              <View style={styles.dateGrid}>
+                {calendarDays.map((date) => {
+                  const story = stories[date];
+                  const selected = selectedDate === date;
 
-        <View style={styles.photoSection}><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>오늘 사진</Text><Text style={styles.filterText}>{photos.length}/5</Text></View>{photos.length === 0 ? <Pressable style={styles.photoEmpty} onPress={pickPhoto}><Camera color={colors.primary} size={28} /><Text style={styles.emptyTitle}>AI 일지에 사용할 사진을 골라보세요</Text><Text style={styles.stateText}>사진이 없어도 기록은 계속 저장됩니다.</Text></Pressable> : <><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoRow}>{photos.map((uri) => <Image key={uri} source={{ uri }} style={styles.photo} />)}</ScrollView><Pressable style={styles.changePhotos} onPress={pickPhoto}><Text style={styles.retryText}>사진 다시 선택</Text></Pressable></>}</View>
-      </ScrollView>
+                  return (
+                    <Pressable
+                      key={date}
+                      style={[styles.dateCell, selected && styles.dateCellActive]}
+                      onPress={() => {
+                        setSelectedDate(date);
+                        if (story) openStory(date);
+                      }}
+                    >
+                      {story ? (
+                        <ImageBackground
+                          fadeDuration={0}
+                          imageStyle={styles.dateThumbnailImage}
+                          source={{ uri: story.image }}
+                          style={styles.dateThumbnail}
+                        >
+                          <View style={[styles.dateOverlay, selected && styles.dateOverlayActive]}>
+                            <Text style={styles.thumbnailDateText}>{date}</Text>
+                          </View>
+                        </ImageBackground>
+                      ) : (
+                        <Text style={[styles.dateText, selected && styles.dateTextActive]}>{date}</Text>
+                      )}
+                    </Pressable>
+                  );
+                })}
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <View key={`dummy-${index}`} style={[styles.dateCell, styles.dummyCell]} />
+                ))}
+              </View>
+            </View>
 
-      <Modal visible={editor !== null} transparent animationType="slide" onRequestClose={() => setEditor(null)}><View style={styles.backdrop}><View style={styles.sheet}><View style={styles.sectionHeader}><Text style={styles.sheetTitle}>{recordTypes.find((item) => item.type === editor)?.label} 기록</Text><Pressable onPress={() => setEditor(null)}><X color={colors.primaryDark} size={22} /></Pressable></View>{editor === "FEEDING" && <><TextInput value={amount} onChangeText={setAmount} keyboardType="number-pad" placeholder="수유량 ml (수유 시간과 택일)" style={styles.input} /><TextInput value={duration} onChangeText={setDuration} keyboardType="number-pad" placeholder="수유 시간 분 (수유량과 택일)" style={styles.input} /><TextInput value={memo} onChangeText={setMemo} placeholder="메모 (선택)" style={styles.input} /></>}{editor === "SLEEP" && <TextInput value={duration} onChangeText={setDuration} keyboardType="number-pad" placeholder="수면 시간 (분)" style={styles.input} />}{(editor === "URINE" || editor === "STOOL") && <Text style={styles.stateText}>현재 시각에 보통 양과 정상 색상으로 빠르게 기록합니다.</Text>}<Pressable disabled={saving || (editor === "FEEDING" && !amount && !duration)} style={[styles.saveButton, saving && styles.disabled]} onPress={save}>{saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveText}>저장하기</Text>}</Pressable></View></View></Modal>
-    </SafeAreaView>
+            <Animated.View
+              style={[styles.previewSwipeWrap, { transform: [{ translateX: previewTranslateX }] }]}
+              {...previewPanResponder.panHandlers}
+            >
+              <Pressable style={styles.previewCard} onPress={() => selectedStory ? openStory(selectedDate) : openEditor()}>
+                {selectedStory ? (
+                  <ImageBackground imageStyle={styles.previewImage} source={{ uri: selectedStory.image }} style={styles.previewImageBox}>
+                    <View style={styles.previewOverlay}>
+                      <Text style={styles.previewDate}>6월 {selectedDate}일</Text>
+                      <Text style={styles.previewTitle}>{selectedStory.title}</Text>
+                      <Text numberOfLines={2} style={styles.previewText}>{selectedStory.text}</Text>
+                    </View>
+                  </ImageBackground>
+                ) : (
+                  <View style={styles.emptyStory}>
+                    <ImagePlus color={colors.primary} size={34} />
+                    <Text style={styles.emptyTitle}>이 날짜에 일기를 남겨보세요</Text>
+                    <Text style={styles.emptyText}>사진을 추가하면 캘린더 썸네일과 스토리에 바로 보여요.</Text>
+                  </View>
+                )}
+              </Pressable>
+            </Animated.View>
+          </View>
+        </SafeAreaView>
+      )}
+
+      {editorOpen && (
+        <SafeAreaView style={styles.fixedArea}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editorFlex}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+              <View style={styles.editorFlex}>
+                <View style={styles.editorHeader}>
+                  <Pressable hitSlop={12} style={styles.iconButton} onPress={closeEditor}>
+                    <X color={colors.primaryDark} size={24} />
+                  </Pressable>
+                  <Text style={styles.editorTitle}>일기 쓰기</Text>
+                  <Pressable style={styles.saveButton} onPress={saveDiary}>
+                    <Save color="#FFFFFF" size={15} />
+                    <Text style={styles.saveButtonText}>저장</Text>
+                  </Pressable>
+                </View>
+
+                <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.editorBody}>
+                  <Pressable style={styles.photoPicker} onPress={pickPhoto}>
+                    {draftImageUri ? (
+                      <Image source={{ uri: draftImageUri }} resizeMode="cover" style={styles.draftPhoto} />
+                    ) : (
+                      <View style={styles.photoEmpty}>
+                        <ImagePlus color={colors.primary} size={34} />
+                        <Text style={styles.photoEmptyText}>사진 추가하기</Text>
+                        <Text style={styles.photoEmptySubText}>내 갤러리에서 사진을 선택해요</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                  <TextInput
+                    value={draftTitle}
+                    onBlur={Keyboard.dismiss}
+                    onChangeText={setDraftTitle}
+                    placeholder="일기 제목"
+                    placeholderTextColor={colors.textMuted}
+                    returnKeyType="done"
+                    style={styles.titleInput}
+                  />
+                  <TextInput
+                    multiline
+                    blurOnSubmit
+                    onBlur={Keyboard.dismiss}
+                    onChangeText={setDraftText}
+                    placeholder="오늘의 순간을 적어보세요"
+                    placeholderTextColor={colors.textMuted}
+                    returnKeyType="done"
+                    style={styles.bodyInput}
+                    textAlignVertical="top"
+                    value={draftText}
+                  />
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      )}
+
+      <Modal animationType="fade" onRequestClose={() => setStoryOpen(false)} transparent visible={storyOpen}>
+        <StoryCarousel
+          dates={calendarDays.filter((date) => stories[date])}
+          initialDate={selectedDate}
+          onClose={() => setStoryOpen(false)}
+          stories={stories}
+        />
+      </Modal>
+    </View>
   );
 }
 
-function formatRecord(record: CareRecord) {
-  if (record.type === "FEEDING") return record.content.formulaAmountMl ? `${record.content.formulaAmountMl}ml` : `${record.content.durationMinutes ?? "-"}분`;
-  if (record.type === "SLEEP" && record.startedAt && record.endedAt) return `${Math.round((new Date(record.endedAt).getTime() - new Date(record.startedAt).getTime()) / 60000)}분`;
-  return [record.content.amount, record.content.color, record.content.form].filter(Boolean).join(" · ") || "기록 완료";
-}
-
 const styles = StyleSheet.create({
-  safe: { backgroundColor: colors.background, flex: 1 }, content: { gap: 18, padding: 18, paddingBottom: 36 },
-  header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" }, eyebrow: { color: colors.textMuted, fontSize: 12 }, title: { color: colors.primaryDark, fontSize: 26, fontWeight: "900" },
-  iconButton: { alignItems: "center", backgroundColor: colors.surface, borderRadius: 6, height: 42, justifyContent: "center", width: 42 },
-  summaryRow: { flexDirection: "row", gap: 8 }, summaryItem: { alignItems: "center", backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 6, borderWidth: 1, flex: 1, paddingVertical: 10 }, summaryActive: { backgroundColor: colors.blueSoft, borderColor: colors.primary }, summaryCount: { color: colors.primaryDark, fontSize: 20, fontWeight: "900" }, summaryLabel: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
-  quickRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, quickButton: { alignItems: "center", backgroundColor: colors.surface, borderRadius: 6, flexDirection: "row", gap: 8, minHeight: 48, paddingHorizontal: 12, width: "48.7%" }, quickText: { color: colors.primaryDark, flex: 1, fontSize: 14, fontWeight: "800" },
-  sectionHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" }, sectionTitle: { color: colors.primaryDark, fontSize: 18, fontWeight: "900" }, filterText: { color: colors.primary, fontSize: 12, fontWeight: "800" },
-  state: { alignItems: "center", backgroundColor: colors.surface, borderRadius: 6, gap: 8, minHeight: 140, justifyContent: "center", padding: 20 }, stateText: { color: colors.textMuted, fontSize: 13, lineHeight: 19, textAlign: "center" }, emptyTitle: { color: colors.primaryDark, fontSize: 15, fontWeight: "900", textAlign: "center" }, errorText: { color: colors.danger, fontSize: 13, textAlign: "center" }, retry: { backgroundColor: colors.blueSoft, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 9 }, retryText: { color: colors.primary, fontSize: 13, fontWeight: "900" },
-  timeline: { gap: 8 }, recordRow: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 6, borderWidth: 1, flexDirection: "row", gap: 12, padding: 14 }, dot: { backgroundColor: colors.accent, borderRadius: 999, height: 10, marginTop: 5, width: 10 }, recordBody: { flex: 1 }, recordTitle: { color: colors.primaryDark, fontSize: 15, fontWeight: "900" }, recordTime: { color: colors.textMuted, fontSize: 12, marginTop: 2 }, recordDetail: { color: colors.text, fontSize: 13, marginTop: 7 },
-  photoSection: { gap: 10 }, photoEmpty: { alignItems: "center", backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 6, borderStyle: "dashed", borderWidth: 1, gap: 7, minHeight: 150, justifyContent: "center", padding: 18 }, photoRow: { gap: 8 }, photo: { borderRadius: 6, height: 120, width: 96 }, changePhotos: { alignItems: "center", padding: 8 },
-  backdrop: { backgroundColor: "rgba(45,37,32,0.38)", flex: 1, justifyContent: "flex-end" }, sheet: { backgroundColor: colors.background, borderTopLeftRadius: 8, borderTopRightRadius: 8, gap: 12, padding: 20, paddingBottom: 32 }, sheetTitle: { color: colors.primaryDark, fontSize: 20, fontWeight: "900" }, input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 6, borderWidth: 1, color: colors.text, minHeight: 48, paddingHorizontal: 14 }, saveButton: { alignItems: "center", backgroundColor: colors.primary, borderRadius: 6, minHeight: 50, justifyContent: "center" }, disabled: { opacity: 0.5 }, saveText: { color: "#FFFFFF", fontSize: 14, fontWeight: "900" }
+  root: {
+    backgroundColor: colors.background,
+    flex: 1
+  },
+  fixedArea: {
+    backgroundColor: colors.background,
+    flex: 1
+  },
+  topNav: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 8
+  },
+  titleBlock: {
+    gap: 3
+  },
+  navEyebrow: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  navTitle: {
+    color: colors.primaryDark,
+    fontSize: 26,
+    fontWeight: "800"
+  },
+  diaryButton: {
+    alignItems: "center",
+    backgroundColor: colors.accent,
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10
+  },
+  diaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  fixedContent: {
+    flex: 1,
+    gap: 14,
+    paddingBottom: 14,
+    paddingHorizontal: 20,
+    paddingTop: 14
+  },
+  calendarCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    borderRadius: 26,
+    borderWidth: 1,
+    padding: 14,
+    shadowColor: "#7A563B",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20
+  },
+  calendarHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10
+  },
+  monthTitle: {
+    color: colors.primaryDark,
+    fontSize: 18,
+    fontWeight: "800"
+  },
+  photoBadge: {
+    alignItems: "center",
+    backgroundColor: colors.blueSoft,
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+  photoBadgeText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  weekRow: {
+    flexDirection: "row",
+    marginBottom: 6
+  },
+  weekText: {
+    color: colors.textMuted,
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "800",
+    textAlign: "center"
+  },
+  dateGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap"
+  },
+  dateCell: {
+    alignItems: "center",
+    aspectRatio: 1,
+    borderRadius: 14,
+    justifyContent: "center",
+    margin: "0.75%",
+    overflow: "hidden",
+    width: "12.78%"
+  },
+  dateCellActive: {
+    backgroundColor: colors.blueSoft
+  },
+  dateText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  dateTextActive: {
+    color: colors.primary,
+    fontWeight: "900"
+  },
+  dateThumbnail: {
+    flex: 1,
+    width: "100%"
+  },
+  dateThumbnailImage: {
+    borderRadius: 14
+  },
+  dateOverlay: {
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.16)",
+    flex: 1,
+    justifyContent: "center"
+  },
+  dateOverlayActive: {
+    borderColor: colors.accent,
+    borderRadius: 14,
+    borderWidth: 2
+  },
+  thumbnailDateText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  dummyCell: {
+    backgroundColor: "transparent"
+  },
+  previewCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    borderRadius: 28,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 190,
+    overflow: "hidden"
+  },
+  previewSwipeWrap: {
+    flex: 1,
+    minHeight: 190
+  },
+  previewImageBox: {
+    flex: 1
+  },
+  previewImage: {
+    borderRadius: 28
+  },
+  previewOverlay: {
+    backgroundColor: "rgba(0,0,0,0.28)",
+    flex: 1,
+    justifyContent: "flex-end",
+    padding: 18
+  },
+  previewDate: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  previewTitle: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 4
+  },
+  previewText: {
+    color: "rgba(255,255,255,0.86)",
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6
+  },
+  emptyStory: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    padding: 24
+  },
+  emptyTitle: {
+    color: colors.primaryDark,
+    fontSize: 18,
+    fontWeight: "900",
+    marginTop: 12
+  },
+  emptyText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 6,
+    textAlign: "center"
+  },
+  editorFlex: {
+    flex: 1
+  },
+  editorHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingVertical: 10
+  },
+  iconButton: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 999,
+    height: 42,
+    justifyContent: "center",
+    width: 42
+  },
+  editorTitle: {
+    color: colors.primaryDark,
+    fontSize: 18,
+    fontWeight: "900"
+  },
+  saveButton: {
+    alignItems: "center",
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 10
+  },
+  saveButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  editorBody: {
+    gap: 14,
+    paddingBottom: 32,
+    paddingHorizontal: 20,
+    paddingTop: 8
+  },
+  photoPicker: {
+    aspectRatio: 9 / 12,
+    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    borderRadius: 28,
+    borderStyle: "dashed",
+    borderWidth: 1,
+    overflow: "hidden"
+  },
+  draftPhoto: {
+    height: "100%",
+    width: "100%"
+  },
+  photoEmpty: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center"
+  },
+  photoEmptyText: {
+    color: colors.primaryDark,
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 10
+  },
+  photoEmptySubText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginTop: 4
+  },
+  titleInput: {
+    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: "800",
+    paddingHorizontal: 16,
+    paddingVertical: 14
+  },
+  bodyInput: {
+    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 22,
+    minHeight: 150,
+    padding: 16
+  }
 });
