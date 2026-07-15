@@ -9,9 +9,9 @@ from sqlalchemy.pool import StaticPool
 from app.api.deps import get_current_user, get_db
 from app.db.base import Base
 from app.main import app
-from app.models.records import Baby, BabyCaregiver
+from app.models.records import Baby
 from app.models.user import User
-from scripts.seed_records_demo import ensure_demo_caregivers
+from scripts.seed_records_demo import select_demo_owner
 
 
 class RecordsApiTest(unittest.TestCase):
@@ -94,12 +94,14 @@ class RecordsApiTest(unittest.TestCase):
         app.dependency_overrides.pop(get_current_user)
         self.assertEqual(self.client.get("/api/records", params={"babyId": self.baby.id}).status_code, 401)
 
-    def test_demo_seed_adds_existing_users_as_caregivers(self) -> None:
-        ensure_demo_caregivers(self.db, self.baby)
+    def test_demo_seed_selects_latest_real_user_as_owner(self) -> None:
+        latest = User(social_provider="google", social_user_id="latest-real-user", nickname="최근 사용자")
+        self.db.add(latest)
         self.db.flush()
 
-        caregiver = self.db.query(BabyCaregiver).filter_by(baby_id=self.baby.id, user_id=self.other.id).one_or_none()
-        self.assertIsNotNone(caregiver)
+        owner = select_demo_owner(self.db)
+
+        self.assertEqual(owner.id, latest.id)
 
 
 if __name__ == "__main__":
