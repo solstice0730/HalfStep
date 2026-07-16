@@ -131,6 +131,88 @@ class CalendarApiTest(unittest.TestCase):
         )
         self.assertEqual(unauthorized.status_code, 401)
 
+    def test_daily_timeline_orders_records_and_builds_summary(self) -> None:
+        self.create_record(
+            "feeding",
+            {
+                "occurredAt": "2026-07-15T09:00:00+09:00",
+                "feedingType": "FORMULA",
+                "amountMl": 120,
+            },
+        )
+        self.create_record(
+            "sleep",
+            {
+                "startedAt": "2026-07-15T10:00:00+09:00",
+                "endedAt": "2026-07-15T11:30:00+09:00",
+                "sleepType": "NAP",
+            },
+        )
+        self.create_record(
+            "urine",
+            {
+                "occurredAt": "2026-07-15T12:00:00+09:00",
+                "amount": "MEDIUM",
+                "color": "NORMAL",
+            },
+        )
+        self.create_record(
+            "stool",
+            {
+                "occurredAt": "2026-07-15T13:00:00+09:00",
+                "amount": "SMALL",
+                "color": "GREEN",
+                "form": "SOFT",
+            },
+        )
+
+        response = self.client.get(
+            "/api/calendar/daily",
+            params={"babyId": self.baby.id, "date": "2026-07-15"},
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()["data"]
+        self.assertEqual(data["date"], "2026-07-15")
+        self.assertIsNone(data["diary"])
+        self.assertEqual(
+            [item["summary"] for item in data["timeline"]],
+            ["분유 120ml", "수면 1시간 30분", "소변 · 보통 · 정상", "대변 · 적음 · 초록 · 무른 변"],
+        )
+        self.assertEqual(
+            data["daySummary"],
+            {"feedingCount": 1, "sleepTotalMinutes": 90, "urineCount": 1, "stoolCount": 1},
+        )
+
+    def test_daily_timeline_uses_korean_day_boundary_and_empty_state(self) -> None:
+        self.create_record("urine", {"occurredAt": "2026-07-16T00:30:00+09:00"})
+
+        previous = self.client.get(
+            "/api/calendar/daily",
+            params={"babyId": self.baby.id, "date": "2026-07-15"},
+        )
+        selected = self.client.get(
+            "/api/calendar/daily",
+            params={"babyId": self.baby.id, "date": "2026-07-16"},
+        )
+
+        self.assertEqual(previous.status_code, 200)
+        self.assertEqual(previous.json()["data"]["timeline"], [])
+        self.assertEqual(
+            previous.json()["data"]["daySummary"],
+            {"feedingCount": 0, "sleepTotalMinutes": 0, "urineCount": 0, "stoolCount": 0},
+        )
+        self.assertEqual(len(selected.json()["data"]["timeline"]), 1)
+        self.assertEqual(selected.json()["data"]["timeline"][0]["time"], "2026-07-16T00:30:00+09:00")
+
+    def test_daily_timeline_requires_owner(self) -> None:
+        app.dependency_overrides[get_current_user] = lambda: self.other
+        forbidden = self.client.get(
+            "/api/calendar/daily",
+            params={"babyId": self.baby.id, "date": "2026-07-15"},
+        )
+        self.assertEqual(forbidden.status_code, 404)
+
 
 if __name__ == "__main__":
     unittest.main()

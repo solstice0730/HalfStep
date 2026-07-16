@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -20,5 +22,20 @@ def get_month(
         "success": True,
         "data": calendar_service.get_month(
             db, user=user, baby_id=baby_id, year=year, month=month
+        ),
+    }
+
+
+@router.get("/daily")
+def get_day(
+    baby_id: int = Query(alias="babyId", gt=0),
+    target_date: date = Query(alias="date"),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    return {
+        "success": True,
+        "data": calendar_service.get_day(
+            db, user=user, baby_id=baby_id, target_date=target_date
         ),
     }
