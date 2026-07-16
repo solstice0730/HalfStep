@@ -1039,9 +1039,16 @@ GET /calendar?babyId={babyId}&year={year}&month={month}
     "days": [
       {
         "date": "2025-05-15",
-        "hasDiary": true,
-        "thumbnailUrl": "https://cdn.../thumb.jpg",
-        "recordTypes": ["FEEDING", "SLEEP", "URINE"]
+        "hasDiary": false,
+        "thumbnailUrl": null,
+        "recordCount": 4,
+        "recordTypes": ["FEEDING", "SLEEP", "URINE", "STOOL"],
+        "recordCounts": {
+          "feeding": 1,
+          "sleep": 1,
+          "urine": 1,
+          "stool": 1
+        }
       }
     ]
   }
@@ -1064,23 +1071,18 @@ GET /calendar/daily?babyId={babyId}&date={date}
   "success": true,
   "data": {
     "date": "2025-05-15",
-    "diary": {
-      "id": "uuid",
-      "content": "오늘 아기와...",
-      "imageUrls": ["https://cdn.../image1.jpg"],
-      "isAiGenerated": true
-    },
+    "diary": null,
     "timeline": [
       {
         "id": "uuid",
         "type": "FEEDING",
-        "time": "2025-05-15T06:00:00Z",
-        "summary": "모유 수유 (좌) 20분"
+        "time": "2025-05-15T06:00:00+09:00",
+        "summary": "분유 120ml"
       },
       {
         "id": "uuid",
         "type": "SLEEP",
-        "time": "2025-05-15T07:00:00Z",
+        "time": "2025-05-15T09:30:00+09:00",
         "summary": "수면 2시간 30분"
       }
     ],
