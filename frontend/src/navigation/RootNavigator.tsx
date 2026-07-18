@@ -5,7 +5,7 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useEffect } from "react";
 
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
-import { MainTabNavigator } from "@/navigation/MainTabNavigator";
+import { AppStackNavigator } from "@/navigation/AppStackNavigator";
 import { colors } from "@/shared/constants/colors";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 
@@ -24,10 +24,15 @@ const linking = {
       Main: {
         path: "",
         screens: {
-          Home: "",
-          Records: "records",
-          Family: "family",
-          Community: "community"
+          Tabs: {
+            path: "",
+            screens: {
+              Home: "",
+              Records: "records",
+              Calendar: "calendar",
+              Community: "community"
+            }
+          }
         }
       }
     }
@@ -76,7 +81,7 @@ function MainRoute() {
     return <BootScreen />;
   }
 
-  return <MainTabNavigator />;
+  return <AppStackNavigator />;
 }
 
 function BootScreen() {

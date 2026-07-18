@@ -1,49 +1,26 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { BookOpen, Home, MessageCircleMore } from "lucide-react-native";
-import { StyleSheet, View } from "react-native";
+import { BookOpen, CalendarDays, Home, MessageCircleMore } from "lucide-react-native";
 
+import { CalendarScreen } from "@/features/calendar/screens/CalendarScreen";
 import { CommunityScreen } from "@/features/community/screens/CommunityScreen";
-import { FamilyRoomScreen } from "@/features/family/screens/FamilyRoomScreen";
 import { HomeScreen } from "@/features/home/screens/HomeScreen";
 import { RecordsScreen } from "@/features/records/screens/RecordsScreen";
 import { colors } from "@/shared/constants/colors";
 
 export type MainTabParamList = {
   Home: undefined;
-  Records: { draftImageUri?: string } | undefined;
-  Family: undefined;
+  Records:
+    | {
+        draftImageUri?: string;
+        openRecordModal?: "feeding" | "sleep" | "urine" | "stool";
+        selectedDate?: string;
+      }
+    | undefined;
+  Calendar: undefined;
   Community: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
-
-function FamilyTabIcon({ color }: { color: string }) {
-  return (
-    <View style={styles.familyIconWrap}>
-      <View
-        style={[
-          styles.chatBubble,
-          {
-            backgroundColor: colors.blueSoft,
-            borderColor: color
-          }
-        ]}
-      />
-      <View
-        style={[
-          styles.chatBubbleTail,
-          {
-            backgroundColor: colors.blueSoft,
-            borderColor: color
-          }
-        ]}
-      />
-      <View style={[styles.avatarCircle, styles.avatarOne, { backgroundColor: colors.accent }]} />
-      <View style={[styles.avatarCircle, styles.avatarTwo, { backgroundColor: colors.primary }]} />
-      <View style={[styles.avatarCircle, styles.avatarThree, { backgroundColor: colors.peachSoft }]} />
-    </View>
-  );
-}
 
 export function MainTabNavigator() {
   return (
@@ -83,11 +60,11 @@ export function MainTabNavigator() {
         }}
       />
       <Tab.Screen
-        name="Family"
-        component={FamilyRoomScreen}
+        name="Calendar"
+        component={CalendarScreen}
         options={{
-          title: "가족방",
-          tabBarIcon: ({ color }) => <FamilyTabIcon color={color} />
+          title: "캘린더",
+          tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} />
         }}
       />
       <Tab.Screen
@@ -101,52 +78,3 @@ export function MainTabNavigator() {
     </Tab.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  familyIconWrap: {
-    height: 30,
-    position: "relative",
-    width: 34
-  },
-  chatBubble: {
-    borderRadius: 10,
-    borderWidth: 2,
-    bottom: 3,
-    height: 23,
-    left: 1,
-    position: "absolute",
-    width: 30
-  },
-  chatBubbleTail: {
-    borderBottomWidth: 2,
-    borderLeftWidth: 0,
-    borderRightWidth: 2,
-    borderTopWidth: 0,
-    bottom: 1,
-    height: 8,
-    left: 8,
-    position: "absolute",
-    transform: [{ rotate: "35deg" }],
-    width: 8
-  },
-  avatarCircle: {
-    borderColor: colors.background,
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 14,
-    position: "absolute",
-    width: 14
-  },
-  avatarOne: {
-    left: 4,
-    top: 7
-  },
-  avatarTwo: {
-    left: 11,
-    top: 4
-  },
-  avatarThree: {
-    right: 4,
-    top: 9
-  }
-});

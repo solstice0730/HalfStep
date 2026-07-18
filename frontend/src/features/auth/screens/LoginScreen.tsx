@@ -63,7 +63,38 @@ export function LoginScreen() {
             <OAuthLoginButton key={option.provider} option={option} />
           ))}
         </View>
+
+        {__DEV__ && <DevLoginButton />}
       </View>
+    </View>
+  );
+}
+
+// ponytail: dev-only bypass so QA on a physical device (Expo Go) can log in without real
+// OAuth keys configured. __DEV__ is false in production builds, so this never ships.
+function DevLoginButton() {
+  const { signInWithProviderToken } = useAuth();
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handlePress = async () => {
+    setIsSigningIn(true);
+    setErrorMessage(null);
+    try {
+      await signInWithProviderToken("google", `dev:google:tester-${Date.now()}`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "테스트 로그인에 실패했습니다.");
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
+  return (
+    <View style={styles.devLoginWrap}>
+      <Pressable disabled={isSigningIn} onPress={handlePress} style={[styles.devButton, isSigningIn && styles.disabledButton]}>
+        {isSigningIn ? <ActivityIndicator color={colors.primaryDark} /> : <Text style={styles.devButtonText}>테스트 계정으로 로그인 (dev)</Text>}
+      </Pressable>
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
     </View>
   );
 }
@@ -247,5 +278,24 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 18,
     marginTop: 8
+  },
+  devLoginWrap: {
+    borderColor: colors.border,
+    borderTopWidth: 1,
+    marginTop: 18,
+    paddingTop: 18
+  },
+  devButton: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: 8,
+    justifyContent: "center",
+    minHeight: 48,
+    paddingHorizontal: 16
+  },
+  devButtonText: {
+    color: colors.primaryDark,
+    fontSize: 13,
+    fontWeight: "800"
   }
 });
