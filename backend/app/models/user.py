@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import DateTime, String, UniqueConstraint, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -27,3 +27,5 @@ class User(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+    babies = relationship("Baby", back_populates="owner", cascade="all, delete-orphan")
