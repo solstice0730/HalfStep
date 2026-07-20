@@ -7,6 +7,7 @@ import {
   storeAuthSession
 } from "@/services/storage/authStorage";
 import type { AuthSession, AuthUser, OAuthProvider } from "@/features/auth/types/auth";
+import { setAuthFailureHandler } from "@/services/api/apiClient";
 
 type AuthContextValue = {
   accessToken: string | null;
@@ -55,6 +56,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
       // In-memory auth still lets the current session continue if web storage is unavailable.
     }
   }, []);
+
+  const expireSession = useCallback(async () => {
+    await clearStoredAuthSession();
+    setSession(null);
+  }, []);
+
+  useEffect(() => {
+    setAuthFailureHandler(expireSession);
+    return () => setAuthFailureHandler(null);
+  }, [expireSession]);
 
   const signInWithProviderToken = useCallback(
     async (provider: OAuthProvider, providerAccessToken: string) => {

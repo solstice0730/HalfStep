@@ -40,17 +40,17 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { BabyProfileSheet } from "@/features/baby/components/BabyProfileSheet";
+import { useBaby } from "@/features/baby/hooks/useBaby";
 import { QuickLogMenu } from "@/features/home/components/QuickLogMenu";
 import { TodaySummary } from "@/features/home/components/TodaySummary";
-import { calculateBabyAge, getBabyProfile, type BabyProfile } from "@/features/home/services/babyProfileService";
+import { calculateBabyAge, type BabyProfile } from "@/features/home/services/babyProfileService";
 import { getDiaryByDate } from "@/features/diary/services/diaryService";
 import { getTodayRecords } from "@/features/records/services/recordsService";
 import type { TodayRecords } from "@/features/records/types/records";
 import { askAiQuestion, fetchDailySummary, type AskResult, type DailySummaryResult } from "@/services/api/aiApi";
 import { colors } from "@/shared/constants/colors";
 
-// Baby 프로필 API(Epic B)가 붙기 전까지 쓰는 임시 아이디. backend mock CareLog와 짝을 맞춘다.
-const DEMO_BABY_ID = "demo-baby-1";
 const todayIsoDate = () => new Date().toISOString().slice(0, 10);
 const todayDisplayDate = () =>
   new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" });
@@ -118,6 +118,7 @@ type AsyncStatus = "idle" | "loading" | "success" | "error";
 
 export function HomeScreen({ navigation }: HomeScreenProps) {
   const { accessToken, signOut } = useAuth();
+  const { activeBaby, error: babyError, isLoading: isBabyLoading, refresh: refreshBabies } = useBaby();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const pagerRef = useRef<ScrollView>(null);
@@ -127,6 +128,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickSheet, setQuickSheet] = useState<QuickSheetType>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [babyMenuOpen, setBabyMenuOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [facing, setFacing] = useState<"front" | "back">("back");
@@ -140,39 +142,30 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   const [questionInput, setQuestionInput] = useState("");
   const [askStatus, setAskStatus] = useState<AsyncStatus>("idle");
   const [askResult, setAskResult] = useState<AskResult | null>(null);
-  const [profileStatus, setProfileStatus] = useState<AsyncStatus>("loading");
-  const [babyProfile, setBabyProfile] = useState<BabyProfile | null>(null);
   const [todayRecords, setTodayRecords] = useState<TodayRecords>({ feeding: [], sleep: [], urine: [], stool: [] });
   const [diarySaved, setDiarySaved] = useState(false);
 
-  const loadProfile = useCallback(async () => {
-    setProfileStatus("loading");
-    try {
-      const profile = await getBabyProfile();
-      setBabyProfile(profile);
-      setProfileStatus("success");
-    } catch {
-      setProfileStatus("error");
-    }
-  }, []);
+  const babyProfile = useMemo<BabyProfile | null>(() => activeBaby ? ({
+    id: activeBaby.id,
+    name: activeBaby.name,
+    birthDate: activeBaby.birthDate,
+    ageDays: activeBaby.ageInDays
+  }) : null, [activeBaby]);
+  const profileStatus: AsyncStatus = isBabyLoading ? "loading" : babyError ? "error" : "success";
 
   const loadTodaySummary = useCallback(async () => {
-    if (!accessToken) return;
+    if (!accessToken || !activeBaby) return;
     try {
       const [records, diary] = await Promise.all([
-        getTodayRecords(accessToken, todayIsoDate()),
-        getDiaryByDate(todayIsoDate())
+        getTodayRecords(accessToken, activeBaby.id, todayIsoDate()),
+        getDiaryByDate(accessToken, activeBaby.id, todayIsoDate())
       ]);
       setTodayRecords(records);
       setDiarySaved(diary !== null);
     } catch {
       // 홈 요약은 부가 정보이므로 실패해도 화면은 계속 사용 가능해야 한다.
     }
-  }, [accessToken]);
-
-  useEffect(() => {
-    void loadProfile();
-  }, [loadProfile]);
+  }, [accessToken, activeBaby]);
 
   useFocusEffect(
     useCallback(() => {
@@ -183,10 +176,10 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   const babyAge = babyProfile ? calculateBabyAge(babyProfile.birthDate) : null;
 
   const loadDailySummary = async () => {
-    if (!accessToken) return;
+    if (!accessToken || !activeBaby) return;
     setSummaryStatus("loading");
     try {
-      const result = await fetchDailySummary(accessToken, DEMO_BABY_ID, todayIsoDate());
+      const result = await fetchDailySummary(accessToken, activeBaby.id, todayIsoDate());
       setDailySummary(result);
       setSummaryStatus("success");
     } catch {
@@ -209,10 +202,10 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
 
   const handleAskQuestion = async () => {
     const question = questionInput.trim();
-    if (!accessToken || !question) return;
+    if (!accessToken || !activeBaby || !question) return;
     setAskStatus("loading");
     try {
-      const result = await askAiQuestion(accessToken, DEMO_BABY_ID, todayIsoDate(), question);
+      const result = await askAiQuestion(accessToken, activeBaby.id, todayIsoDate(), question);
       setAskResult(result);
       setAskStatus("success");
     } catch {
@@ -363,8 +356,8 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
       <View style={styles.homeRoot}>
         {quickOpen && <Pressable style={styles.quickDismissLayer} onPress={closeQuickLog} />}
         <View style={styles.header}>
-          <Pressable style={styles.statusPill}>
-            <Text style={styles.statusText}>함께 자라는 중</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="아기 프로필 변경" style={styles.statusPill} onPress={() => setBabyMenuOpen(true)}>
+            <Text numberOfLines={1} style={styles.activeBabyName}>{activeBaby?.name ?? "아기"}</Text>
             <ChevronDown color={colors.textMuted} size={18} />
           </Pressable>
           <View style={styles.headerActions}>
@@ -391,7 +384,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
           profileStatus={profileStatus}
           babyProfile={babyProfile}
           babyAge={babyAge}
-          onRetryProfile={loadProfile}
+          onRetryProfile={() => void refreshBabies()}
           todayRecords={todayRecords}
           diarySaved={diarySaved}
           lastQuickRecord={lastQuickRecord}
@@ -628,6 +621,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
           </View>
         </View>
       </Modal>
+      <BabyProfileSheet visible={babyMenuOpen} onClose={() => setBabyMenuOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -672,6 +666,11 @@ const styles = StyleSheet.create({
   statusText: {
     color: colors.primaryDark,
     fontSize: 24,
+    fontWeight: "900"
+  },
+  activeBabyName: {
+    color: colors.primaryDark,
+    fontSize: 14,
     fontWeight: "900"
   },
   headerActions: {

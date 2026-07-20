@@ -23,11 +23,21 @@ interface ApiEnvelope<T> {
 }
 
 interface RequestOptions {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   accessToken: string;
-  body?: unknown;
+  body?: unknown | FormData;
   query?: Record<string, string | number | undefined>;
   timeoutMs?: number;
+}
+
+let authFailureHandler: (() => void | Promise<void>) | null = null;
+
+export function setAuthFailureHandler(handler: (() => void | Promise<void>) | null) {
+  authFailureHandler = handler;
+}
+
+export function notifyAuthFailure() {
+  void authFailureHandler?.();
 }
 
 function buildUrl(path: string, query?: Record<string, string | number | undefined>): string {
@@ -44,14 +54,15 @@ export async function apiRequest<T>(path: string, options: RequestOptions): Prom
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   let response: Response;
+  const isMultipart = typeof FormData !== "undefined" && body instanceof FormData;
   try {
     response = await fetch(buildUrl(path, query), {
       method,
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json"
+        ...(isMultipart ? {} : { "Content-Type": "application/json" })
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? (isMultipart ? body : JSON.stringify(body)) : undefined,
       signal: controller.signal
     });
   } catch {
@@ -64,6 +75,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions): Prom
   }
 
   if (response.status === 401) {
+    notifyAuthFailure();
     throw new ApiRequestError("auth", "인증이 만료되었습니다.");
   }
   if (response.status === 404) {
