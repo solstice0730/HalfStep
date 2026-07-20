@@ -1,7 +1,8 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { ArrowLeft, Plus, X } from "lucide-react-native";
+import * as ImagePicker from "expo-image-picker";
+import { ArrowLeft, ImagePlus, X } from "lucide-react-native";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -18,6 +19,7 @@ import {
 } from "@/features/community/types/community";
 import type { AppStackParamList } from "@/navigation/AppStackNavigator";
 import { ApiRequestError } from "@/services/api/apiClient";
+import { uploadImages } from "@/services/api/uploadApi";
 import { colors } from "@/shared/constants/colors";
 
 type Props = NativeStackScreenProps<AppStackParamList, "CommunityWrite">;
@@ -34,8 +36,7 @@ export function CommunityWriteScreen({ navigation }: Props) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [imageInput, setImageInput] = useState("");
+  const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,15 +44,30 @@ export function CommunityWriteScreen({ navigation }: Props) {
   const contentValid = content.trim().length >= 2;
   const canSubmit = titleValid && contentValid && !submitting;
 
-  const addImageUrl = () => {
-    const url = imageInput.trim();
-    if (!url || imageUrls.length >= MAX_POST_IMAGES) return;
-    setImageUrls((current) => [...current, url]);
-    setImageInput("");
+  const pickImages = async () => {
+    if (images.length >= MAX_POST_IMAGES) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setError("사진을 추가하려면 사진 보관함 접근 권한이 필요합니다.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      selectionLimit: MAX_POST_IMAGES - images.length,
+      quality: 0.9
+    });
+    if (!result.canceled) {
+      setImages((current) => {
+        const known = new Set(current.map((image) => image.uri));
+        return [...current, ...result.assets.filter((image) => !known.has(image.uri))].slice(0, MAX_POST_IMAGES);
+      });
+      setError(null);
+    }
   };
 
-  const removeImageUrl = (url: string) => {
-    setImageUrls((current) => current.filter((item) => item !== url));
+  const removeImage = (uri: string) => {
+    setImages((current) => current.filter((item) => item.uri !== uri));
   };
 
   const handleSubmit = async () => {
@@ -59,6 +75,7 @@ export function CommunityWriteScreen({ navigation }: Props) {
     setSubmitting(true);
     setError(null);
     try {
+      const imageUrls = await uploadImages(accessToken, images);
       const result = await createPost(accessToken, {
         category,
         title: title.trim(),
@@ -144,29 +161,23 @@ export function CommunityWriteScreen({ navigation }: Props) {
           />
         </View>
 
-        <Text style={styles.label}>이미지 URL ({imageUrls.length}/{MAX_POST_IMAGES})</Text>
-        {imageUrls.map((url) => (
-          <View key={url} style={styles.imageRow}>
-            <Text numberOfLines={1} style={styles.imageUrlText}>{url}</Text>
-            <Pressable hitSlop={8} onPress={() => removeImageUrl(url)}>
-              <X color={colors.textMuted} size={16} />
+        <Text style={styles.label}>사진 ({images.length}/{MAX_POST_IMAGES})</Text>
+        <View style={styles.imageGrid}>
+          {images.map((image) => (
+            <View key={image.uri} style={styles.imagePreviewWrap}>
+              <Image resizeMode="cover" source={{ uri: image.uri }} style={styles.imagePreview} />
+              <Pressable accessibilityLabel="사진 삭제" hitSlop={8} onPress={() => removeImage(image.uri)} style={styles.imageRemoveButton}>
+                <X color="#FFFFFF" size={14} />
+              </Pressable>
+            </View>
+          ))}
+          {images.length < MAX_POST_IMAGES && (
+            <Pressable accessibilityLabel="사진 추가" onPress={() => void pickImages()} style={styles.imagePickerButton}>
+              <ImagePlus color={colors.primary} size={24} />
+              <Text style={styles.imagePickerText}>사진 추가</Text>
             </Pressable>
-          </View>
-        ))}
-        {imageUrls.length < MAX_POST_IMAGES && (
-          <View style={styles.imageAddRow}>
-            <TextInput
-              onChangeText={setImageInput}
-              placeholder="이미지 URL 추가"
-              placeholderTextColor={colors.textMuted}
-              style={styles.imageInput}
-              value={imageInput}
-            />
-            <Pressable onPress={addImageUrl} style={styles.imageAddButton}>
-              <Plus color="#FFFFFF" size={16} />
-            </Pressable>
-          </View>
-        )}
+          )}
+        </View>
 
         {error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -268,43 +279,48 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between"
   },
-  imageRow: {
+  imageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
+  },
+  imagePreviewWrap: {
+    height: 92,
+    position: "relative",
+    width: 92
+  },
+  imagePreview: {
+    borderRadius: 14,
+    height: 92,
+    width: 92
+  },
+  imageRemoveButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(45,37,32,0.7)",
+    borderRadius: 999,
+    height: 24,
+    justifyContent: "center",
+    position: "absolute",
+    right: 4,
+    top: 4,
+    width: 24
+  },
+  imagePickerButton: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 12,
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 8
-  },
-  imageUrlText: {
-    color: colors.text,
-    flex: 1,
-    fontSize: 12
-  },
-  imageAddRow: {
-    flexDirection: "row",
-    gap: 8
-  },
-  imageInput: {
-    backgroundColor: "#FFFFFF",
     borderColor: colors.border,
-    borderRadius: 16,
+    borderRadius: 14,
+    borderStyle: "dashed",
     borderWidth: 1,
-    color: colors.text,
-    flex: 1,
-    fontSize: 13,
-    minHeight: 44,
-    paddingHorizontal: 12
-  },
-  imageAddButton: {
-    alignItems: "center",
-    backgroundColor: colors.accent,
-    borderRadius: 999,
-    height: 44,
+    gap: 5,
+    height: 92,
     justifyContent: "center",
-    width: 44
+    width: 92
+  },
+  imagePickerText: {
+    color: colors.primaryDark,
+    fontSize: 12,
+    fontWeight: "800"
   },
   errorText: {
     color: colors.danger,

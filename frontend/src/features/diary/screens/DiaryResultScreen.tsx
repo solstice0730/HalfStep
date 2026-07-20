@@ -17,9 +17,12 @@ import {
 
 import type { AppStackParamList } from "@/navigation/AppStackNavigator";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useBaby } from "@/features/baby/hooks/useBaby";
 import { AiRequestError, generateDiary } from "@/services/api/aiApi";
 import type { DiaryGenerationResponse } from "@/features/records/types/records";
 import { saveDiary } from "@/features/diary/services/diaryService";
+import { ApiRequestError } from "@/services/api/apiClient";
+import { uploadImages } from "@/services/api/uploadApi";
 import { colors } from "@/shared/constants/colors";
 
 type DiaryResultScreenProps = NativeStackScreenProps<AppStackParamList, "DiaryResult">;
@@ -29,6 +32,7 @@ type AsyncStatus = "idle" | "loading" | "success" | "error";
 export function DiaryResultScreen({ route, navigation }: DiaryResultScreenProps) {
   const { date, request, photoUris, memo } = route.params;
   const { accessToken, signOut } = useAuth();
+  const { activeBaby } = useBaby();
 
   const [response, setResponse] = useState<DiaryGenerationResponse>(route.params.response);
   const [title, setTitle] = useState(response.title);
@@ -76,22 +80,28 @@ export function DiaryResultScreen({ route, navigation }: DiaryResultScreenProps)
   };
 
   const handleSave = async () => {
-    if (titleInvalid || contentInvalid || saveStatus === "loading") return;
+    if (titleInvalid || contentInvalid || saveStatus === "loading" || !accessToken || !activeBaby) return;
     setSaveStatus("loading");
     setSaveError(null);
     try {
-      await saveDiary({
+      const imageUrls = await uploadImages(accessToken, photoUris.map((uri) => ({ uri })));
+      await saveDiary(accessToken, {
+        babyId: activeBaby.id,
         date,
         title: title.trim(),
         content: content.trim(),
         highlights: response.highlights,
-        photoUris,
-        generatedByAi: response.generatedByAi,
-        savedAt: new Date().toISOString()
+        imageUrls,
+        isAiGenerated: response.generatedByAi,
+        notice: response.notice
       });
       setSaveStatus("success");
       navigation.goBack();
-    } catch {
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.kind === "auth") {
+        await signOut();
+        return;
+      }
       setSaveStatus("error");
       setSaveError("일기를 저장하지 못했습니다.\n잠시 후 다시 시도해 주세요.");
     }
