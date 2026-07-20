@@ -30,4 +30,3 @@ All unpublished feature migrations are rebased into one linear chain. A feature 
 - The database enforces one diary per baby and date.
 - Protected endpoints continue to return authorization-safe 404 responses for inaccessible resources.
 - Every branch is tested before push and every PR is checked again before merge.
-

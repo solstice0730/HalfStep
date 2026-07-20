@@ -78,4 +78,3 @@
 - [ ] Run `alembic upgrade head` against an empty database.
 - [ ] Verify authentication, baby profile, records, calendar, diary, and community API flows.
 - [ ] Record exact verification results in the relevant PR descriptions.
-

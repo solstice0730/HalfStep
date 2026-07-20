@@ -1427,10 +1427,17 @@ DELETE /family-rooms/{roomId}/members/{userId}
 
 ## 9. 커뮤니티 (Community)
 
+> **MVP 구현 상태 (2026-07-13)**
+> - 구현 완료: 게시글 목록 조회, 상세 조회, 작성
+> - 후속 구현: 게시글 수정·삭제, 좋아요, 댓글, 신고
+> - 커뮤니티와 사용자 ID는 DB의 `BIGINT` 값을 JSON 문자열로 반환한다.
+> - 좋아요·댓글 기능 구현 전까지 목록과 상세의 관련 개수는 `0`, `isLiked`는 `false`다.
+> - AI 유사글 추천 구현 전까지 작성 응답의 `similarPosts`는 빈 배열이다.
+
 ### 9.1 게시글 목록 조회
 
 ```
-GET /posts?category={category}
+GET /posts?category={category}&ageGroup={ageGroup}
 ```
 
 > 🔒 인증 필요
@@ -1440,6 +1447,7 @@ GET /posts?category={category}
 | 파라미터 | 필수 | 설명 |
 | --- | --- | --- |
 | `category` | X | `PREGNANCY` \| `BIRTH_STORY` \| `POSTPARTUM_CENTER` \| `NEWBORN` \| `FEEDING` \| `HEALTH` \| `SLEEP_DEVELOPMENT` \| `FREE` \| `COUNSELING` |
+| `ageGroup` | X | `M0_2` \| `M3_5` \| `M6_8` \| `M9_11` \| `M12_17` \| `M18_24` \| `ALL_AGES` |
 | `cursor` | X | 페이지네이션 커서 |
 | `limit` | X | 기본 20 |
 
@@ -1449,10 +1457,11 @@ GET /posts?category={category}
   "success": true,
   "data": [
     {
-      "id": "uuid",
+      "id": "1",
       "category": "NEWBORN",
       "title": "생후 45일 수면 패턴 공유해요",
       "preview": "저희 아기는 요즘...",
+      "babyAgeMonths": 4,
       "author": {
         "nickname": "익명",
         "isAnonymous": true
@@ -1485,13 +1494,14 @@ GET /posts/{postId}
 {
   "success": true,
   "data": {
-    "id": "uuid",
+    "id": "1",
     "category": "NEWBORN",
     "title": "생후 45일 수면 패턴 공유해요",
     "content": "저희 아기는 요즘...",
+    "babyAgeMonths": 4,
     "imageUrls": ["https://cdn.../image1.jpg"],
     "author": {
-      "userId": "uuid",
+      "userId": "1",
       "nickname": "익명",
       "isAnonymous": true
     },
@@ -1520,6 +1530,7 @@ POST /posts
   "category": "NEWBORN",
   "title": "생후 45일 수면 패턴 공유해요",
   "content": "저희 아기는 요즘...",
+  "babyAgeMonths": 4,
   "imageUrls": ["https://cdn.../image1.jpg"],  // 최대 5장
   "isAnonymous": false
 }
@@ -1530,14 +1541,8 @@ POST /posts
 {
   "success": true,
   "data": {
-    "id": "uuid",
-    "similarPosts": [              // AI 유사글 추천 (최대 3개)
-      {
-        "id": "uuid",
-        "title": "비슷한 게시글 제목",
-        "preview": "..."
-      }
-    ]
+    "id": "1",
+    "similarPosts": []             // AI 유사글 추천 구현 전에는 빈 배열
   }
 }
 ```

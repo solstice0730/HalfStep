@@ -507,6 +507,7 @@ UNIQUE(family_room_id, user_id)
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | id | BIGINT | 카테고리 PK |
+| code | VARCHAR | API에서 사용하는 고유 카테고리 코드 |
 | name | VARCHAR | 카테고리 이름 |
 | description | TEXT | 설명 |
 | sort_order | INT | 정렬 순서 |
@@ -539,6 +540,8 @@ UNIQUE(family_room_id, user_id)
 | user_id | BIGINT | 작성자 ID |
 | title | VARCHAR | 제목 |
 | content | TEXT | 본문 |
+| image_urls | JSON | 첨부 이미지 URL 목록, 최대 5개 |
+| baby_age_months | SMALLINT | 작성 시점 아기 월령, 0~24개월, 월령 무관은 NULL |
 | is_anonymous | BOOLEAN | 익명 여부 |
 | view_count | INT | 조회수 |
 | created_at | DATETIME | 생성일 |
@@ -549,6 +552,8 @@ UNIQUE(family_room_id, user_id)
 ### 4.14 community_comments
 
 커뮤니티 댓글을 저장한다.
+
+> 현재 커뮤니티 MVP에서는 생성하지 않으며 댓글 기능 구현 시 migration을 추가한다.
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
