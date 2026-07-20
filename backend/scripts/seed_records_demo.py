@@ -4,7 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models.records import Baby, CareLog
+from app.models.baby import Baby
+from app.models.records import CareLog
 from app.models.user import User
 
 

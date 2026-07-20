@@ -65,6 +65,37 @@ def current_date() -> date:
     return datetime.now(APP_TIMEZONE).date()
 
 
+def summarize_logs(logs: list[CareLog]) -> dict:
+    summary = {
+        "feedingCount": 0,
+        "sleepTotalMinutes": 0,
+        "urineCount": 0,
+        "stoolCount": 0,
+        "lastFeedingAt": None,
+        "lastSleepAt": None,
+    }
+    for log in logs:
+        if log.log_type == "FEEDING":
+            summary["feedingCount"] += 1
+            if summary["lastFeedingAt"] is None or log.occurred_at > summary["lastFeedingAt"]:
+                summary["lastFeedingAt"] = log.occurred_at
+        elif log.log_type == "SLEEP":
+            if log.started_at is not None and log.ended_at is not None:
+                summary["sleepTotalMinutes"] += max(
+                    0, round((log.ended_at - log.started_at).total_seconds() / 60)
+                )
+            if summary["lastSleepAt"] is None or log.occurred_at > summary["lastSleepAt"]:
+                summary["lastSleepAt"] = log.occurred_at
+        elif log.log_type == "URINE":
+            summary["urineCount"] += 1
+        elif log.log_type == "STOOL":
+            summary["stoolCount"] += 1
+
+    summary["lastFeedingAt"] = to_app_timezone(summary["lastFeedingAt"])
+    summary["lastSleepAt"] = to_app_timezone(summary["lastSleepAt"])
+    return summary
+
+
 def _encode_cursor(record: CareLog) -> str:
     payload = json.dumps({"occurredAt": record.occurred_at.isoformat(), "id": record.id}, separators=(",", ":"))
     return base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")

@@ -3,7 +3,8 @@ from datetime import datetime
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.records import Baby, CareLog
+from app.models.baby import Baby
+from app.models.records import CareLog
 
 
 def get_accessible_baby(db: Session, *, baby_id: int, user_id: int) -> Baby | None:

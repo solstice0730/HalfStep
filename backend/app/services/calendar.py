@@ -1,13 +1,14 @@
 from collections import defaultdict
+from datetime import date
 
 from sqlalchemy.orm import Session
 
-from datetime import date
-
 from app.core.time import day_bounds, month_bounds, to_app_timezone
+from app.models.diary import Diary
 from app.models.records import CareLog
 from app.models.user import User
 from app.repositories import calendar_repository
+from app.services.diary_service import get_diary_by_date_service
 from app.services.records import require_baby_access
 
 RECORD_TYPE_ORDER = ("FEEDING", "SLEEP", "URINE", "STOOL")
@@ -38,15 +39,23 @@ def get_month(
     logs = calendar_repository.list_logs_in_range(
         db, baby_id=baby_id, start_at=start_at, end_at=end_at
     )
+    start_date = date(year, month, 1)
+    end_date = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    diaries = calendar_repository.list_diaries_in_range(
+        db, baby_id=baby_id, start_date=start_date, end_date=end_date
+    )
+
     grouped: dict[str, list[CareLog]] = defaultdict(list)
     for log in logs:
         occurred_at = to_app_timezone(log.occurred_at)
         if occurred_at is not None:
             grouped[occurred_at.date().isoformat()].append(log)
 
+    diaries_by_date = {diary.diary_date.isoformat(): diary for diary in diaries}
     days = []
-    for target_date in sorted(grouped):
+    for target_date in sorted(set(grouped) | set(diaries_by_date)):
         day_logs = grouped[target_date]
+        diary = diaries_by_date.get(target_date)
         counts = {record_type: 0 for record_type in RECORD_TYPE_ORDER}
         for log in day_logs:
             if log.log_type in counts:
@@ -54,8 +63,8 @@ def get_month(
         days.append(
             {
                 "date": target_date,
-                "hasDiary": False,
-                "thumbnailUrl": None,
+                "hasDiary": diary is not None,
+                "thumbnailUrl": _diary_thumbnail(diary),
                 "recordCount": len(day_logs),
                 "recordTypes": [
                     record_type for record_type in RECORD_TYPE_ORDER if counts[record_type]
@@ -76,6 +85,9 @@ def get_day(db: Session, *, user: User, baby_id: int, target_date: date) -> dict
     start_at, end_at = day_bounds(target_date)
     logs = calendar_repository.list_logs_in_range(
         db, baby_id=baby_id, start_at=start_at, end_at=end_at
+    )
+    diary = get_diary_by_date_service(
+        db, user_id=user.id, baby_id=baby_id, diary_date=target_date
     )
     summary = {
         "feedingCount": 0,
@@ -103,10 +115,16 @@ def get_day(db: Session, *, user: User, baby_id: int, target_date: date) -> dict
         )
     return {
         "date": target_date.isoformat(),
-        "diary": None,
+        "diary": diary,
         "timeline": timeline,
         "daySummary": summary,
     }
+
+
+def _diary_thumbnail(diary: Diary | None) -> str | None:
+    if diary is None or not diary.photos:
+        return None
+    return min(diary.photos, key=lambda photo: photo.sort_order).image_url
 
 
 def _sleep_minutes(log: CareLog) -> int:

@@ -1,5 +1,5 @@
 import unittest
-from datetime import date
+from datetime import date, datetime
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.api.deps import get_current_user, get_db
+from app.core.time import APP_TIMEZONE
 from app.db.base import Base
 from app.main import app
-from app.models.records import Baby
+from app.models.baby import Baby
 from app.models.user import User
 from scripts.seed_records_demo import select_demo_owner
 
@@ -93,6 +94,51 @@ class RecordsApiTest(unittest.TestCase):
         self.assertEqual(forbidden.status_code, 404)
         app.dependency_overrides.pop(get_current_user)
         self.assertEqual(self.client.get("/api/records", params={"babyId": self.baby.id}).status_code, 401)
+
+    def test_home_dashboard_summarizes_today_records(self) -> None:
+        today = datetime.now(APP_TIMEZONE).date().isoformat()
+        self.client.post(
+            "/api/records/feeding",
+            json={
+                "babyId": self.baby.id,
+                "occurredAt": f"{today}T09:00:00+09:00",
+                "feedingType": "FORMULA",
+                "amountMl": 120,
+            },
+        )
+        self.client.post(
+            "/api/records/sleep",
+            json={
+                "babyId": self.baby.id,
+                "startedAt": f"{today}T10:00:00+09:00",
+                "endedAt": f"{today}T11:30:00+09:00",
+            },
+        )
+        self.client.post(
+            "/api/records/urine",
+            json={"babyId": self.baby.id, "occurredAt": f"{today}T12:00:00+09:00"},
+        )
+        self.client.post(
+            "/api/records/stool",
+            json={"babyId": self.baby.id, "occurredAt": f"{today}T13:00:00+09:00"},
+        )
+
+        response = self.client.get(
+            "/api/home/dashboard", params={"babyId": self.baby.id}
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(
+            response.json()["data"]["todaySummary"],
+            {
+                "feedingCount": 1,
+                "sleepTotalMinutes": 90,
+                "urineCount": 1,
+                "stoolCount": 1,
+                "lastFeedingAt": f"{today}T09:00:00+09:00",
+                "lastSleepAt": f"{today}T11:30:00+09:00",
+            },
+        )
 
     def test_demo_seed_selects_latest_real_user_as_owner(self) -> None:
         latest = User(social_provider="google", social_user_id="latest-real-user", nickname="최근 사용자")

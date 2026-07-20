@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.deps import get_current_user, get_db
 from app.db.base import Base
 from app.main import app
-from app.models.records import Baby
+from app.models.baby import Baby
 from app.models.user import User
 
 
@@ -44,6 +44,22 @@ class CalendarApiTest(unittest.TestCase):
     def create_record(self, path: str, body: dict) -> None:
         response = self.client.post(f"/api/records/{path}", json={"babyId": self.baby.id, **body})
         self.assertEqual(response.status_code, 201, response.text)
+
+    def create_diary(self, target_date: str = "2026-07-18") -> dict:
+        response = self.client.post(
+            "/api/diary",
+            json={
+                "babyId": self.baby.id,
+                "date": target_date,
+                "title": "A day to remember",
+                "content": "The diary content",
+                "isAiGenerated": False,
+                "highlights": ["walk"],
+                "imageUrls": ["https://example.test/diary.jpg"],
+            },
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        return response.json()["data"]
 
     def test_monthly_calendar_groups_record_days_and_types(self) -> None:
         self.create_record(
@@ -112,6 +128,28 @@ class CalendarApiTest(unittest.TestCase):
         )
         self.assertEqual(leap.status_code, 200)
         self.assertEqual(leap.json()["data"]["days"][0]["date"], "2028-02-29")
+
+    def test_monthly_calendar_includes_diary_only_day_and_thumbnail(self) -> None:
+        self.create_diary()
+
+        response = self.client.get(
+            "/api/calendar", params={"babyId": self.baby.id, "year": 2026, "month": 7}
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(
+            response.json()["data"]["days"],
+            [
+                {
+                    "date": "2026-07-18",
+                    "hasDiary": True,
+                    "thumbnailUrl": "https://example.test/diary.jpg",
+                    "recordCount": 0,
+                    "recordTypes": [],
+                    "recordCounts": {"feeding": 0, "sleep": 0, "urine": 0, "stool": 0},
+                }
+            ],
+        )
 
     def test_monthly_calendar_validates_input_and_owner(self) -> None:
         invalid = self.client.get(
@@ -204,6 +242,17 @@ class CalendarApiTest(unittest.TestCase):
         )
         self.assertEqual(len(selected.json()["data"]["timeline"]), 1)
         self.assertEqual(selected.json()["data"]["timeline"][0]["time"], "2026-07-16T00:30:00+09:00")
+
+    def test_daily_timeline_includes_saved_diary(self) -> None:
+        diary = self.create_diary("2026-07-15")
+
+        response = self.client.get(
+            "/api/calendar/daily",
+            params={"babyId": self.baby.id, "date": "2026-07-15"},
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["data"]["diary"], diary)
 
     def test_daily_timeline_requires_owner(self) -> None:
         app.dependency_overrides[get_current_user] = lambda: self.other
