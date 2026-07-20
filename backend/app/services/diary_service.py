@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.diary import Diary
+from app.repositories.baby_repository import get_baby_by_id
 from app.repositories.diary_repository import (
     create_diary,
     delete_diary,
@@ -52,9 +53,15 @@ def save_diary(
     notice: str | None,
     image_urls: list[str],
 ) -> DiaryResponse:
+    baby = get_baby_by_id(db, baby_id)
+    if baby is None or baby.owner_user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Baby not found.")
+
     # 같은 날짜 일지가 이미 있으면 덮어쓰기
     existing = get_diary_by_date(db, baby_id=baby_id, diary_date=diary_date)
     if existing:
+        if existing.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Diary not found.")
         diary = update_diary(
             db, existing,
             title=title,

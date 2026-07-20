@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -8,6 +8,9 @@ from app.db.base import Base
 
 class Diary(Base):
     __tablename__ = "diaries"
+    __table_args__ = (
+        UniqueConstraint("baby_id", "diary_date", name="uq_diaries_baby_date"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     baby_id: Mapped[int] = mapped_column(ForeignKey("babies.id", ondelete="CASCADE"), index=True)

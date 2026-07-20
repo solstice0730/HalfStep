@@ -33,6 +33,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["baby_id"], ["babies.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("baby_id", "diary_date", name="uq_diaries_baby_date"),
     )
     op.create_index(op.f("ix_diaries_id"), "diaries", ["id"], unique=False)
     op.create_index(op.f("ix_diaries_baby_id"), "diaries", ["baby_id"], unique=False)
