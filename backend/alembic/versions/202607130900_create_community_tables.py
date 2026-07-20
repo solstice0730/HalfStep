@@ -1,7 +1,7 @@
 """create community tables
 
 Revision ID: 202607130900
-Revises: 202607070215
+Revises: 202607150900
 """
 from collections.abc import Sequence
 
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = "202607130900"
-down_revision: str | None = "202607070215"
+down_revision: str | None = "202607150900"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -35,8 +35,11 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
+import { env } from "@/config/env";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { recordsApi } from "@/services/api/recordsApi";
 import { colors } from "@/shared/constants/colors";
+import { buildDiaperRecord, buildFeedingRecord, buildSleepRecord } from "../utils/quickRecordPayloads";
 
 const screenWidth = Dimensions.get("window").width;
 const babyDay = 45;
@@ -48,7 +51,7 @@ const curation = {
 };
 
 type HomeScreenProps = BottomTabScreenProps<MainTabParamList, "Home">;
-type QuickSheetType = "feed" | "medicine" | null;
+type QuickSheetType = "feed" | "medicine" | "diaper" | null;
 
 const formatRecordTime = (date: Date) =>
   date.toLocaleTimeString("ko-KR", {
@@ -101,7 +104,7 @@ function BabyMascot() {
 }
 
 export function HomeScreen({ navigation }: HomeScreenProps) {
-  const { signOut } = useAuth();
+  const { accessToken, signOut } = useAuth();
   const insets = useSafeAreaInsets();
   const pagerRef = useRef<ScrollView>(null);
   const cameraRef = useRef<CameraView>(null);
@@ -118,10 +121,11 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   const [sleepStartedAt, setSleepStartedAt] = useState<Date | null>(null);
   const [diaperCount, setDiaperCount] = useState(0);
   const [lastQuickRecord, setLastQuickRecord] = useState("최근 기록 없음");
-  const [feedType, setFeedType] = useState("분유");
+  const [feedType, setFeedType] = useState<"분유" | "모유">("분유");
   const [feedAmount, setFeedAmount] = useState("");
   const [medicineName, setMedicineName] = useState("");
   const [medicineDose, setMedicineDose] = useState("");
+  const [isSavingRecord, setIsSavingRecord] = useState(false);
 
   const openCamera = () => {
     setCameraOpen(true);
@@ -170,20 +174,30 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     setQuickOpen(false);
   };
 
-  const recordDiaper = () => {
+  const toggleSleep = async () => {
     const now = new Date();
-    setDiaperCount((count) => count + 1);
-    setLastQuickRecord(`배변 1회 · ${formatRecordTime(now)}`);
-    closeQuickLog();
-  };
-
-  const toggleSleep = () => {
-    const now = new Date();
-    setSleepStartedAt((startedAt) => {
-      setLastQuickRecord(`${startedAt ? "수면 종료" : "수면 시작"} · ${formatRecordTime(now)}`);
-      return startedAt ? null : now;
-    });
-    closeQuickLog();
+    if (!sleepStartedAt) {
+      setSleepStartedAt(now);
+      setLastQuickRecord(`수면 시작 · ${formatRecordTime(now)}`);
+      closeQuickLog();
+      return;
+    }
+    if (!accessToken) {
+      setLastQuickRecord("로그인이 필요합니다.");
+      return;
+    }
+    setIsSavingRecord(true);
+    try {
+      const request = buildSleepRecord(env.demoBabyId, sleepStartedAt, now);
+      await recordsApi.create(accessToken, request.type, request.body);
+      setSleepStartedAt(null);
+      setLastQuickRecord(`수면 종료 · ${formatRecordTime(now)}`);
+      closeQuickLog();
+    } catch (error) {
+      setLastQuickRecord(error instanceof Error ? error.message : "수면 기록 저장에 실패했습니다.");
+    } finally {
+      setIsSavingRecord(false);
+    }
   };
 
   const openQuickSheet = (type: QuickSheetType) => {
@@ -191,18 +205,53 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     closeQuickLog();
   };
 
-  const saveQuickSheet = () => {
+  const saveDiaperRecord = async (type: "URINE" | "STOOL") => {
+    if (!accessToken) {
+      setLastQuickRecord("로그인이 필요합니다.");
+      return;
+    }
     const now = new Date();
-    if (quickSheet === "feed") {
-      setLastQuickRecord(`${feedType} ${feedAmount || "기록"} · ${formatRecordTime(now)}`);
+    setIsSavingRecord(true);
+    try {
+      const request = buildDiaperRecord(env.demoBabyId, now, type);
+      await recordsApi.create(accessToken, request.type, request.body);
+      setDiaperCount((count) => count + 1);
+      setLastQuickRecord(`${type === "URINE" ? "소변" : "대변"} 1회 · ${formatRecordTime(now)}`);
+      setQuickSheet(null);
+    } catch (error) {
+      setLastQuickRecord(error instanceof Error ? error.message : "기저귀 기록 저장에 실패했습니다.");
+    } finally {
+      setIsSavingRecord(false);
     }
+  };
+
+  const saveQuickSheet = async () => {
     if (quickSheet === "medicine") {
+      const now = new Date();
       setLastQuickRecord(`${medicineName || "약"} ${medicineDose || "복용"} · ${formatRecordTime(now)}`);
+      setQuickSheet(null);
+      setMedicineName("");
+      setMedicineDose("");
+      return;
     }
-    setQuickSheet(null);
-    setFeedAmount("");
-    setMedicineName("");
-    setMedicineDose("");
+    if (quickSheet !== "feed") return;
+    if (!accessToken) {
+      setLastQuickRecord("로그인이 필요합니다.");
+      return;
+    }
+    const now = new Date();
+    setIsSavingRecord(true);
+    try {
+      const request = buildFeedingRecord(env.demoBabyId, now, feedType, feedAmount);
+      await recordsApi.create(accessToken, request.type, request.body);
+      setLastQuickRecord(`${feedType} ${feedAmount}${feedType === "분유" ? "ml" : "분"} · ${formatRecordTime(now)}`);
+      setQuickSheet(null);
+      setFeedAmount("");
+    } catch (error) {
+      setLastQuickRecord(error instanceof Error ? error.message : "수유 기록 저장에 실패했습니다.");
+    } finally {
+      setIsSavingRecord(false);
+    }
   };
 
   const homeSwipeResponder = useMemo(
@@ -305,7 +354,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                     <Image source={require("../../../../assets/images/quick-sleep.png")} resizeMode="contain" style={styles.quickLogIcon} />
                     <Text style={styles.quickLogText}>{sleepStartedAt ? "기상" : "수면"}</Text>
                   </Pressable>
-                  <Pressable style={styles.quickLogItem} onPress={recordDiaper}>
+                  <Pressable style={styles.quickLogItem} onPress={() => openQuickSheet("diaper")}>
                     <Image source={require("../../../../assets/images/quick-diaper.png")} resizeMode="contain" style={styles.quickLogIcon} />
                     <Text style={styles.quickLogText}>배변</Text>
                   </Pressable>
@@ -448,7 +497,9 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         <View style={styles.modalBackdrop}>
           <View style={styles.sheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{quickSheet === "feed" ? "수유 기록" : "약 기록"}</Text>
+              <Text style={styles.modalTitle}>
+                {quickSheet === "feed" ? "수유 기록" : quickSheet === "diaper" ? "기저귀 기록" : "약 기록"}
+              </Text>
               <Pressable onPress={() => setQuickSheet(null)}>
                 <X color={colors.primaryDark} size={22} />
               </Pressable>
@@ -456,7 +507,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
             {quickSheet === "feed" ? (
               <>
                 <View style={styles.segmentInputRow}>
-                  {["분유", "모유"].map((type) => (
+                  {(["분유", "모유"] as const).map((type) => (
                     <Pressable
                       key={type}
                       style={[styles.segmentInput, feedType === type && styles.segmentInputActive]}
@@ -475,6 +526,15 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                   onChangeText={setFeedAmount}
                 />
               </>
+            ) : quickSheet === "diaper" ? (
+              <View style={styles.segmentInputRow}>
+                <Pressable disabled={isSavingRecord} style={styles.segmentInput} onPress={() => saveDiaperRecord("URINE")}>
+                  <Text style={styles.segmentInputText}>소변</Text>
+                </Pressable>
+                <Pressable disabled={isSavingRecord} style={styles.segmentInput} onPress={() => saveDiaperRecord("STOOL")}>
+                  <Text style={styles.segmentInputText}>대변</Text>
+                </Pressable>
+              </View>
             ) : (
               <>
                 <TextInput
@@ -493,9 +553,11 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                 />
               </>
             )}
-            <Pressable style={styles.writeDiaryButton} onPress={saveQuickSheet}>
-              <Text style={styles.writeDiaryButtonText}>저장하기</Text>
-            </Pressable>
+            {quickSheet !== "diaper" && (
+              <Pressable disabled={isSavingRecord} style={styles.writeDiaryButton} onPress={saveQuickSheet}>
+                <Text style={styles.writeDiaryButtonText}>{isSavingRecord ? "저장 중" : "저장하기"}</Text>
+              </Pressable>
+            )}
           </View>
         </View>
       </Modal>
