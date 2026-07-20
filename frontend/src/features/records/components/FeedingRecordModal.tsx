@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { X } from "lucide-react-native";
 
 import { TimePickerField, nowAsTimeValue, type TimeValue } from "@/features/records/components/TimePickerField";
@@ -8,13 +8,14 @@ import { colors } from "@/shared/constants/colors";
 
 interface FeedingRecordModalProps {
   visible: boolean;
+  isSaving: boolean;
   onClose: () => void;
-  onSave: (record: { time: TimeValue; feedingType: FeedingType; amountMl?: number; durationMinutes?: number }) => void;
+  onSave: (record: { time: TimeValue; feedingType: FeedingType; amountMl?: number; durationMinutes?: number }) => Promise<boolean>;
 }
 
 const FEEDING_TYPES = Object.keys(FEEDING_TYPE_LABELS) as FeedingType[];
 
-export function FeedingRecordModal({ visible, onClose, onSave }: FeedingRecordModalProps) {
+export function FeedingRecordModal({ visible, isSaving, onClose, onSave }: FeedingRecordModalProps) {
   const [time, setTime] = useState<TimeValue>(nowAsTimeValue());
   const [feedingType, setFeedingType] = useState<FeedingType>("FORMULA");
   const [amount, setAmount] = useState("");
@@ -24,15 +25,17 @@ export function FeedingRecordModal({ visible, onClose, onSave }: FeedingRecordMo
   const amountValue = Number(amount);
   const isValid = amount.trim().length > 0 && Number.isFinite(amountValue) && amountValue > 0;
 
-  const handleSave = () => {
-    if (!isValid) return;
-    onSave(
+  const handleSave = async () => {
+    if (!isValid || isSaving) return;
+    const saved = await onSave(
       isBreast
         ? { time, feedingType, durationMinutes: amountValue }
         : { time, feedingType, amountMl: amountValue }
     );
-    setAmount("");
-    setTime(nowAsTimeValue());
+    if (saved) {
+      setAmount("");
+      setTime(nowAsTimeValue());
+    }
   };
 
   return (
@@ -77,8 +80,8 @@ export function FeedingRecordModal({ visible, onClose, onSave }: FeedingRecordMo
             <Pressable style={styles.cancelButton} onPress={onClose}>
               <Text style={styles.cancelButtonText}>취소</Text>
             </Pressable>
-            <Pressable disabled={!isValid} style={[styles.saveButton, !isValid && styles.saveButtonDisabled]} onPress={handleSave}>
-              <Text style={styles.saveButtonText}>저장</Text>
+            <Pressable disabled={!isValid || isSaving} style={[styles.saveButton, (!isValid || isSaving) && styles.saveButtonDisabled]} onPress={handleSave}>
+              {isSaving ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.saveButtonText}>저장</Text>}
             </Pressable>
           </View>
         </View>
