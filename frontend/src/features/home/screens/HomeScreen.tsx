@@ -1,6 +1,9 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { useFocusEffect } from "@react-navigation/native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import {
+  BookOpen,
+  CalendarDays,
   Camera,
   ChevronDown,
   Flashlight,
@@ -10,10 +13,10 @@ import {
   X,
   Zap
 } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
-  Dimensions,
   Image,
   Modal,
   NativeScrollEvent,
@@ -24,6 +27,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View
 } from "react-native";
 import {
@@ -35,23 +39,30 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
-import { env } from "@/config/env";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { recordsApi } from "@/services/api/recordsApi";
+import { QuickLogMenu } from "@/features/home/components/QuickLogMenu";
+import { TodaySummary } from "@/features/home/components/TodaySummary";
+import { calculateBabyAge, getBabyProfile, type BabyProfile } from "@/features/home/services/babyProfileService";
+import { getDiaryByDate } from "@/features/diary/services/diaryService";
+import { getTodayRecords } from "@/features/records/services/recordsService";
+import type { TodayRecords } from "@/features/records/types/records";
+import { askAiQuestion, fetchDailySummary, type AskResult, type DailySummaryResult } from "@/services/api/aiApi";
 import { colors } from "@/shared/constants/colors";
-import { buildDiaperRecord, buildFeedingRecord, buildSleepRecord } from "../utils/quickRecordPayloads";
 
-const screenWidth = Dimensions.get("window").width;
-const babyDay = 45;
+// Baby 프로필 API(Epic B)가 붙기 전까지 쓰는 임시 아이디. backend mock CareLog와 짝을 맞춘다.
+const DEMO_BABY_ID = "demo-baby-1";
+const todayIsoDate = () => new Date().toISOString().slice(0, 10);
+const todayDisplayDate = () =>
+  new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" });
 
 const curation = {
-  title: `생후 ${babyDay}일 맞춤 큐레이션`,
+  title: "오늘의 맞춤 큐레이션",
   text: "이 시기에는 수유 텀과 낮잠 리듬이 조금씩 달라져요. 오늘은 수유 간격, 낮잠 길이, 배변 변화를 같이 확인해보세요.",
   chips: ["수유 신호", "낮잠 루틴", "배변 체크"]
 };
 
 type HomeScreenProps = BottomTabScreenProps<MainTabParamList, "Home">;
-type QuickSheetType = "feed" | "medicine" | "diaper" | null;
+type QuickSheetType = "medicine" | null;
 
 const formatRecordTime = (date: Date) =>
   date.toLocaleTimeString("ko-KR", {
@@ -103,9 +114,12 @@ function BabyMascot() {
   );
 }
 
+type AsyncStatus = "idle" | "loading" | "success" | "error";
+
 export function HomeScreen({ navigation }: HomeScreenProps) {
   const { accessToken, signOut } = useAuth();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const pagerRef = useRef<ScrollView>(null);
   const cameraRef = useRef<CameraView>(null);
   const cameraTranslateX = useRef(new Animated.Value(-screenWidth)).current;
@@ -118,14 +132,93 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   const [facing, setFacing] = useState<"front" | "back">("back");
   const [flashOn, setFlashOn] = useState(false);
   const [lastShot, setLastShot] = useState<string | null>(null);
-  const [sleepStartedAt, setSleepStartedAt] = useState<Date | null>(null);
-  const [diaperCount, setDiaperCount] = useState(0);
-  const [lastQuickRecord, setLastQuickRecord] = useState("최근 기록 없음");
-  const [feedType, setFeedType] = useState<"분유" | "모유">("분유");
-  const [feedAmount, setFeedAmount] = useState("");
   const [medicineName, setMedicineName] = useState("");
   const [medicineDose, setMedicineDose] = useState("");
-  const [isSavingRecord, setIsSavingRecord] = useState(false);
+  const [lastQuickRecord, setLastQuickRecord] = useState<string | null>(null);
+  const [summaryStatus, setSummaryStatus] = useState<AsyncStatus>("idle");
+  const [dailySummary, setDailySummary] = useState<DailySummaryResult | null>(null);
+  const [questionInput, setQuestionInput] = useState("");
+  const [askStatus, setAskStatus] = useState<AsyncStatus>("idle");
+  const [askResult, setAskResult] = useState<AskResult | null>(null);
+  const [profileStatus, setProfileStatus] = useState<AsyncStatus>("loading");
+  const [babyProfile, setBabyProfile] = useState<BabyProfile | null>(null);
+  const [todayRecords, setTodayRecords] = useState<TodayRecords>({ feeding: [], sleep: [], urine: [], stool: [] });
+  const [diarySaved, setDiarySaved] = useState(false);
+
+  const loadProfile = useCallback(async () => {
+    setProfileStatus("loading");
+    try {
+      const profile = await getBabyProfile();
+      setBabyProfile(profile);
+      setProfileStatus("success");
+    } catch {
+      setProfileStatus("error");
+    }
+  }, []);
+
+  const loadTodaySummary = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const [records, diary] = await Promise.all([
+        getTodayRecords(accessToken, todayIsoDate()),
+        getDiaryByDate(todayIsoDate())
+      ]);
+      setTodayRecords(records);
+      setDiarySaved(diary !== null);
+    } catch {
+      // 홈 요약은 부가 정보이므로 실패해도 화면은 계속 사용 가능해야 한다.
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadTodaySummary();
+    }, [loadTodaySummary])
+  );
+
+  const babyAge = babyProfile ? calculateBabyAge(babyProfile.birthDate) : null;
+
+  const loadDailySummary = async () => {
+    if (!accessToken) return;
+    setSummaryStatus("loading");
+    try {
+      const result = await fetchDailySummary(accessToken, DEMO_BABY_ID, todayIsoDate());
+      setDailySummary(result);
+      setSummaryStatus("success");
+    } catch {
+      setSummaryStatus("error");
+    }
+  };
+
+  useEffect(() => {
+    if (chatOpen) {
+      void loadDailySummary();
+    }
+  }, [chatOpen]);
+
+  // contentOffset only applies on the ScrollView's very first layout pass, which can race
+  // ahead of a late/large initial measurement (e.g. tablets) and leave the pager showing the
+  // blank left page. Force it explicitly whenever the measured width is known or changes.
+  useEffect(() => {
+    pagerRef.current?.scrollTo({ x: screenWidth, y: 0, animated: false });
+  }, [screenWidth]);
+
+  const handleAskQuestion = async () => {
+    const question = questionInput.trim();
+    if (!accessToken || !question) return;
+    setAskStatus("loading");
+    try {
+      const result = await askAiQuestion(accessToken, DEMO_BABY_ID, todayIsoDate(), question);
+      setAskResult(result);
+      setAskStatus("success");
+    } catch {
+      setAskStatus("error");
+    }
+  };
 
   const openCamera = () => {
     setCameraOpen(true);
@@ -174,30 +267,16 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     setQuickOpen(false);
   };
 
-  const toggleSleep = async () => {
-    const now = new Date();
-    if (!sleepStartedAt) {
-      setSleepStartedAt(now);
-      setLastQuickRecord(`수면 시작 · ${formatRecordTime(now)}`);
-      closeQuickLog();
-      return;
-    }
-    if (!accessToken) {
-      setLastQuickRecord("로그인이 필요합니다.");
-      return;
-    }
-    setIsSavingRecord(true);
-    try {
-      const request = buildSleepRecord(env.demoBabyId, sleepStartedAt, now);
-      await recordsApi.create(accessToken, request.type, request.body);
-      setSleepStartedAt(null);
-      setLastQuickRecord(`수면 종료 · ${formatRecordTime(now)}`);
-      closeQuickLog();
-    } catch (error) {
-      setLastQuickRecord(error instanceof Error ? error.message : "수면 기록 저장에 실패했습니다.");
-    } finally {
-      setIsSavingRecord(false);
-    }
+  const openQuickRecord = (type: "feeding" | "sleep" | "urine" | "stool") => {
+    closeQuickLog();
+    navigation.navigate("Records", { openRecordModal: type });
+  };
+
+  // 배변은 실제 API가 소변/대변을 구분해서 저장하므로, 홈에서는 어느 쪽인지 단정하지 않고
+  // 기록 화면으로만 이동시켜 사용자가 직접 고르게 한다.
+  const openDiaperRecords = () => {
+    closeQuickLog();
+    navigation.navigate("Records");
   };
 
   const openQuickSheet = (type: QuickSheetType) => {
@@ -205,53 +284,14 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     closeQuickLog();
   };
 
-  const saveDiaperRecord = async (type: "URINE" | "STOOL") => {
-    if (!accessToken) {
-      setLastQuickRecord("로그인이 필요합니다.");
-      return;
-    }
+  const saveQuickSheet = () => {
     const now = new Date();
-    setIsSavingRecord(true);
-    try {
-      const request = buildDiaperRecord(env.demoBabyId, now, type);
-      await recordsApi.create(accessToken, request.type, request.body);
-      setDiaperCount((count) => count + 1);
-      setLastQuickRecord(`${type === "URINE" ? "소변" : "대변"} 1회 · ${formatRecordTime(now)}`);
-      setQuickSheet(null);
-    } catch (error) {
-      setLastQuickRecord(error instanceof Error ? error.message : "기저귀 기록 저장에 실패했습니다.");
-    } finally {
-      setIsSavingRecord(false);
-    }
-  };
-
-  const saveQuickSheet = async () => {
     if (quickSheet === "medicine") {
-      const now = new Date();
       setLastQuickRecord(`${medicineName || "약"} ${medicineDose || "복용"} · ${formatRecordTime(now)}`);
-      setQuickSheet(null);
-      setMedicineName("");
-      setMedicineDose("");
-      return;
     }
-    if (quickSheet !== "feed") return;
-    if (!accessToken) {
-      setLastQuickRecord("로그인이 필요합니다.");
-      return;
-    }
-    const now = new Date();
-    setIsSavingRecord(true);
-    try {
-      const request = buildFeedingRecord(env.demoBabyId, now, feedType, feedAmount);
-      await recordsApi.create(accessToken, request.type, request.body);
-      setLastQuickRecord(`${feedType} ${feedAmount}${feedType === "분유" ? "ml" : "분"} · ${formatRecordTime(now)}`);
-      setQuickSheet(null);
-      setFeedAmount("");
-    } catch (error) {
-      setLastQuickRecord(error instanceof Error ? error.message : "수유 기록 저장에 실패했습니다.");
-    } finally {
-      setIsSavingRecord(false);
-    }
+    setQuickSheet(null);
+    setMedicineName("");
+    setMedicineDose("");
   };
 
   const homeSwipeResponder = useMemo(
@@ -291,7 +331,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
           }).start(() => setCameraOpen(false));
         }
       }),
-    [cameraTranslateX]
+    [cameraTranslateX, screenWidth]
   );
 
   const handleCameraGesture = (event: PanGestureHandlerGestureEvent) => {
@@ -319,7 +359,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   };
 
   const renderHomeContent = (handlers?: ReturnType<typeof PanResponder.create>["panHandlers"]) => (
-    <View style={styles.page} {...handlers}>
+    <View style={[styles.page, { width: screenWidth }]} {...handlers}>
       <View style={styles.homeRoot}>
         {quickOpen && <Pressable style={styles.quickDismissLayer} onPress={closeQuickLog} />}
         <View style={styles.header}>
@@ -331,40 +371,14 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
             <Pressable accessibilityRole="button" accessibilityLabel="로그아웃" style={styles.logoutButton} onPress={signOut}>
               <LogOut color={colors.primaryDark} size={19} />
             </Pressable>
-            <View style={styles.quickHeaderWrap}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="빠른 기록 열기"
-                style={[styles.quickLogMain, quickOpen && styles.quickLogMainActive]}
-                onPress={() => setQuickOpen((open) => !open)}
-              >
-                {quickOpen ? (
-                  <X color="#FFFFFF" size={20} />
-                ) : (
-                  <Image source={require("../../../../assets/images/quick-plus.png")} resizeMode="contain" style={styles.quickLogMainImage} />
-                )}
-              </Pressable>
-              {quickOpen && (
-                <View style={styles.quickLogMenu}>
-                  <Pressable style={styles.quickLogItem} onPress={() => openQuickSheet("feed")}>
-                    <Image source={require("../../../../assets/images/quick-feed.png")} resizeMode="contain" style={styles.quickLogIcon} />
-                    <Text style={styles.quickLogText}>수유</Text>
-                  </Pressable>
-                  <Pressable style={styles.quickLogItem} onPress={toggleSleep}>
-                    <Image source={require("../../../../assets/images/quick-sleep.png")} resizeMode="contain" style={styles.quickLogIcon} />
-                    <Text style={styles.quickLogText}>{sleepStartedAt ? "기상" : "수면"}</Text>
-                  </Pressable>
-                  <Pressable style={styles.quickLogItem} onPress={() => openQuickSheet("diaper")}>
-                    <Image source={require("../../../../assets/images/quick-diaper.png")} resizeMode="contain" style={styles.quickLogIcon} />
-                    <Text style={styles.quickLogText}>배변</Text>
-                  </Pressable>
-                  <Pressable style={styles.quickLogItem} onPress={() => openQuickSheet("medicine")}>
-                    <Image source={require("../../../../assets/images/quick-medicine.png")} resizeMode="contain" style={styles.quickLogIcon} />
-                    <Text style={styles.quickLogText}>약</Text>
-                  </Pressable>
-                </View>
-              )}
-            </View>
+            <QuickLogMenu
+              open={quickOpen}
+              onToggle={() => setQuickOpen((open) => !open)}
+              onFeeding={() => openQuickRecord("feeding")}
+              onSleep={() => openQuickRecord("sleep")}
+              onDiaper={openDiaperRecords}
+              onMedicine={() => openQuickSheet("medicine")}
+            />
           </View>
         </View>
 
@@ -372,13 +386,30 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
           <BabyMascot />
         </View>
 
-        <View style={styles.dayBlock}>
-          <Text style={styles.babyName}>리몽이와 만난 지</Text>
-          <Text style={styles.dayText}>{babyDay}일째</Text>
-          <Text style={styles.quickStatusText}>
-            배변 {diaperCount}회 · {sleepStartedAt ? "수면 중" : "깨어 있음"}
-          </Text>
-          <Text style={styles.quickStatusText}>{lastQuickRecord}</Text>
+        <TodaySummary
+          todayDate={todayDisplayDate()}
+          profileStatus={profileStatus}
+          babyProfile={babyProfile}
+          babyAge={babyAge}
+          onRetryProfile={loadProfile}
+          todayRecords={todayRecords}
+          diarySaved={diarySaved}
+          lastQuickRecord={lastQuickRecord}
+        />
+
+        <View style={styles.entryRow}>
+          <Pressable style={styles.entryButton} onPress={() => navigation.navigate("Records")}>
+            <BookOpen color={colors.primary} size={18} />
+            <Text style={styles.entryButtonText}>기록</Text>
+          </Pressable>
+          <Pressable style={styles.entryButton} onPress={() => navigation.navigate("Records")}>
+            <Sparkles color={colors.primary} size={18} />
+            <Text style={styles.entryButtonText}>AI 일기</Text>
+          </Pressable>
+          <Pressable style={styles.entryButton} onPress={() => navigation.navigate("Calendar")}>
+            <CalendarDays color={colors.primary} size={18} />
+            <Text style={styles.entryButtonText}>캘린더</Text>
+          </Pressable>
         </View>
 
         <Pressable style={styles.questionBox} onPress={() => setChatOpen(true)}>
@@ -418,7 +449,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         onMomentumScrollEnd={handleMomentumEnd}
         style={styles.pager}
       >
-        <View style={styles.page} />
+        <View style={[styles.page, { width: screenWidth }]} />
         {renderHomeContent(homeSwipeResponder.panHandlers)}
       </ScrollView>
 
@@ -443,7 +474,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                 lastShot ? (
                   <Image source={{ uri: lastShot }} resizeMode="cover" style={styles.cameraView} />
                 ) : (
-                  <CameraView ref={cameraRef} style={styles.cameraView} facing={facing} />
+                  <CameraView ref={cameraRef} style={styles.cameraView} facing={facing} enableTorch={facing === "back" && flashOn} />
                 )
               ) : (
                 <View style={styles.permissionBox}>
@@ -457,9 +488,13 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
               )}
               {!lastShot && permission?.granted && (
                 <View style={styles.cameraBottomDock}>
-                  <Pressable style={styles.flashButton} onPress={() => setFlashOn((value) => !value)}>
-                    {flashOn ? <Zap color="#F5C842" size={22} /> : <Flashlight color="#FFFFFF" size={21} />}
-                  </Pressable>
+                  {facing === "back" ? (
+                    <Pressable style={styles.flashButton} onPress={() => setFlashOn((value) => !value)}>
+                      {flashOn ? <Zap color="#F5C842" size={22} /> : <Flashlight color="#FFFFFF" size={21} />}
+                    </Pressable>
+                  ) : (
+                    <View style={styles.flashButtonSpacer} />
+                  )}
                   <Pressable style={styles.shutterButton} onPress={takePhoto}>
                     <View style={styles.shutterInner} />
                   </Pressable>
@@ -497,67 +532,28 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         <View style={styles.modalBackdrop}>
           <View style={styles.sheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {quickSheet === "feed" ? "수유 기록" : quickSheet === "diaper" ? "기저귀 기록" : "약 기록"}
-              </Text>
+              <Text style={styles.modalTitle}>약 기록</Text>
               <Pressable onPress={() => setQuickSheet(null)}>
                 <X color={colors.primaryDark} size={22} />
               </Pressable>
             </View>
-            {quickSheet === "feed" ? (
-              <>
-                <View style={styles.segmentInputRow}>
-                  {(["분유", "모유"] as const).map((type) => (
-                    <Pressable
-                      key={type}
-                      style={[styles.segmentInput, feedType === type && styles.segmentInputActive]}
-                      onPress={() => setFeedType(type)}
-                    >
-                      <Text style={[styles.segmentInputText, feedType === type && styles.segmentInputTextActive]}>{type}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-                <TextInput
-                  keyboardType="number-pad"
-                  placeholder="수유량 또는 시간"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.sheetInput}
-                  value={feedAmount}
-                  onChangeText={setFeedAmount}
-                />
-              </>
-            ) : quickSheet === "diaper" ? (
-              <View style={styles.segmentInputRow}>
-                <Pressable disabled={isSavingRecord} style={styles.segmentInput} onPress={() => saveDiaperRecord("URINE")}>
-                  <Text style={styles.segmentInputText}>소변</Text>
-                </Pressable>
-                <Pressable disabled={isSavingRecord} style={styles.segmentInput} onPress={() => saveDiaperRecord("STOOL")}>
-                  <Text style={styles.segmentInputText}>대변</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <>
-                <TextInput
-                  placeholder="약 종류"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.sheetInput}
-                  value={medicineName}
-                  onChangeText={setMedicineName}
-                />
-                <TextInput
-                  placeholder="복용량"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.sheetInput}
-                  value={medicineDose}
-                  onChangeText={setMedicineDose}
-                />
-              </>
-            )}
-            {quickSheet !== "diaper" && (
-              <Pressable disabled={isSavingRecord} style={styles.writeDiaryButton} onPress={saveQuickSheet}>
-                <Text style={styles.writeDiaryButtonText}>{isSavingRecord ? "저장 중" : "저장하기"}</Text>
-              </Pressable>
-            )}
+            <TextInput
+              placeholder="약 종류"
+              placeholderTextColor={colors.textMuted}
+              style={styles.sheetInput}
+              value={medicineName}
+              onChangeText={setMedicineName}
+            />
+            <TextInput
+              placeholder="복용량"
+              placeholderTextColor={colors.textMuted}
+              style={styles.sheetInput}
+              value={medicineDose}
+              onChangeText={setMedicineDose}
+            />
+            <Pressable style={styles.writeDiaryButton} onPress={saveQuickSheet}>
+              <Text style={styles.writeDiaryButtonText}>저장하기</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -575,7 +571,59 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
               <Image source={require("../../../../assets/images/chatbot-home.png")} resizeMode="contain" style={styles.chatBotImage} />
             </View>
             <Text style={styles.chatQuestion}>리몽이의 기록을 바탕으로 무엇을 알려드릴까요?</Text>
-            <Text style={styles.chatBubble}>예: 요즘 낮잠이 짧아졌는데 괜찮을까요?</Text>
+
+            {summaryStatus === "loading" && <ActivityIndicator color={colors.primary} />}
+            {summaryStatus === "error" && (
+              <View style={styles.chatErrorBox}>
+                <Text style={styles.chatErrorText}>오늘 요약을 불러오지 못했어요.</Text>
+                <Pressable onPress={loadDailySummary}>
+                  <Text style={styles.chatRetryText}>다시 시도</Text>
+                </Pressable>
+              </View>
+            )}
+            {summaryStatus === "success" && dailySummary && (
+              <View style={[styles.chatBubble, dailySummary.recordCount === 0 && styles.chatBubbleMuted]}>
+                <Text style={styles.chatBubbleText}>{dailySummary.summary}</Text>
+                {dailySummary.highlights.length > 0 && (
+                  <Text style={styles.chatHighlights}>{dailySummary.highlights.join(" · ")}</Text>
+                )}
+              </View>
+            )}
+
+            <View style={styles.chatInputRow}>
+              <TextInput
+                placeholder="예: 요즘 낮잠이 짧아졌는데 괜찮을까요?"
+                placeholderTextColor={colors.textMuted}
+                style={styles.chatInput}
+                value={questionInput}
+                onChangeText={setQuestionInput}
+                onSubmitEditing={handleAskQuestion}
+              />
+              <Pressable
+                style={styles.chatSendButton}
+                onPress={handleAskQuestion}
+                disabled={askStatus === "loading" || questionInput.trim().length === 0}
+              >
+                <Send color="#FFFFFF" size={16} />
+              </Pressable>
+            </View>
+
+            {askStatus === "loading" && <ActivityIndicator color={colors.primary} />}
+            {askStatus === "error" && (
+              <View style={styles.chatErrorBox}>
+                <Text style={styles.chatErrorText}>답변을 가져오지 못했어요.</Text>
+                <Pressable onPress={handleAskQuestion}>
+                  <Text style={styles.chatRetryText}>다시 시도</Text>
+                </Pressable>
+              </View>
+            )}
+            {askStatus === "success" && askResult && (
+              <View style={[styles.chatBubble, askResult.source === "no_data" && styles.chatBubbleMuted]}>
+                <Text style={styles.chatBubbleText}>{askResult.answer}</Text>
+                <Text style={styles.chatSafetyText}>{askResult.safetyNotice}</Text>
+              </View>
+            )}
+
             <Text style={styles.subscriptionNote}>구독하면 기록 기반 개인화 답변과 주간 리포트를 받을 수 있어요.</Text>
           </View>
         </View>
@@ -593,8 +641,7 @@ const styles = StyleSheet.create({
     flex: 1
   },
   page: {
-    flex: 1,
-    width: screenWidth
+    flex: 1
   },
   homeRoot: {
     flex: 1,
@@ -658,77 +705,26 @@ const styles = StyleSheet.create({
     height: 228,
     width: 174
   },
-  quickHeaderWrap: {
-    alignItems: "center",
-    gap: 8,
-    position: "relative",
-    zIndex: 30
+  entryRow: {
+    flexDirection: "row",
+    gap: 8
   },
-  quickLogMenu: {
-    alignItems: "center",
-    gap: 8,
-    position: "absolute",
-    right: 0,
-    top: 54,
-    width: 92
-  },
-  quickLogItem: {
+  entryButton: {
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    gap: 3,
-    height: 44,
+    flex: 1,
+    flexDirection: "row",
+    gap: 6,
     justifyContent: "center",
-    width: 64
+    paddingVertical: 10
   },
-  quickLogIcon: {
-    height: 24,
-    width: 26
-  },
-  quickLogText: {
+  entryButtonText: {
     color: colors.primaryDark,
-    fontSize: 11,
-    fontWeight: "900"
-  },
-  quickLogMain: {
-    alignItems: "center",
-    backgroundColor: colors.accent,
-    borderColor: colors.surface,
-    borderRadius: 999,
-    borderWidth: 3,
-    height: 46,
-    justifyContent: "center",
-    width: 46
-  },
-  quickLogMainActive: {
-    backgroundColor: colors.primary
-  },
-  quickLogMainImage: {
-    height: 28,
-    width: 28
-  },
-  dayBlock: {
-    marginTop: -2
-  },
-  babyName: {
-    color: colors.primaryDark,
-    fontSize: 17,
-    fontWeight: "900"
-  },
-  dayText: {
-    color: colors.primaryDark,
-    fontSize: 46,
-    fontWeight: "900",
-    letterSpacing: 0,
-    lineHeight: 52
-  },
-  quickStatusText: {
-    color: colors.textMuted,
     fontSize: 12,
-    fontWeight: "700",
-    marginTop: 2
+    fontWeight: "800"
   },
   questionBox: {
     alignItems: "center",
@@ -920,6 +916,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 58
   },
+  flashButtonSpacer: {
+    height: 58,
+    width: 58
+  },
   flipButton: {
     alignItems: "center",
     backgroundColor: "rgba(45,37,32,0.68)",
@@ -1020,29 +1020,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22
   },
-  segmentInputRow: {
-    flexDirection: "row",
-    gap: 8
-  },
-  segmentInput: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
-    borderRadius: 16,
-    flex: 1,
-    minHeight: 44,
-    justifyContent: "center"
-  },
-  segmentInputActive: {
-    backgroundColor: colors.primary
-  },
-  segmentInputText: {
-    color: colors.textMuted,
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  segmentInputTextActive: {
-    color: "#FFFFFF"
-  },
   sheetInput: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -1093,10 +1070,66 @@ const styles = StyleSheet.create({
   chatBubble: {
     backgroundColor: colors.surface,
     borderRadius: 18,
-    color: colors.textMuted,
-    fontSize: 14,
+    gap: 6,
     padding: 14,
     width: "100%"
+  },
+  chatBubbleMuted: {
+    backgroundColor: colors.surfaceSoft
+  },
+  chatBubbleText: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 20
+  },
+  chatHighlights: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  chatSafetyText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    lineHeight: 16
+  },
+  chatInputRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    width: "100%"
+  },
+  chatInput: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    color: colors.primaryDark,
+    flex: 1,
+    fontSize: 14,
+    minHeight: 44,
+    paddingHorizontal: 14
+  },
+  chatSendButton: {
+    alignItems: "center",
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    height: 40,
+    justifyContent: "center",
+    width: 40
+  },
+  chatErrorBox: {
+    alignItems: "center",
+    gap: 4,
+    width: "100%"
+  },
+  chatErrorText: {
+    color: colors.danger,
+    fontSize: 13
+  },
+  chatRetryText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "800"
   },
   subscriptionNote: {
     color: colors.primary,

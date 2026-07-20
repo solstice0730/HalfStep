@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     NAVER_CLIENT_ID: str = ""
     NAVER_CLIENT_SECRET: str = ""
 
+    OPENAI_API_KEY: str = ""
+    AI_MODEL: str = "gpt-4o-mini"
+    AI_FALLBACK_ENABLED: bool = True
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
