@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class DailySummaryRequest(BaseModel):
-    babyId: str = Field(min_length=1)
+    babyId: int = Field(gt=0)
     date: date
 
 
@@ -18,7 +18,7 @@ class DailySummaryResponse(BaseModel):
 
 
 class AskRequest(BaseModel):
-    babyId: str = Field(min_length=1)
+    babyId: int = Field(gt=0)
     date: date
     question: str = Field(min_length=1)
 

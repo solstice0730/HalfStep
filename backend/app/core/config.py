@@ -29,7 +29,11 @@ class Settings(BaseSettings):
     AI_MODEL: str = "gpt-4o-mini"
     AI_FALLBACK_ENABLED: bool = True
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     @field_validator("API_PREFIX")
     @classmethod

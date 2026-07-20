@@ -1,13 +1,18 @@
 import json
 import logging
 import re
+from dataclasses import dataclass
 from datetime import date, timedelta
 
 from fastapi import HTTPException, status
 from openai import OpenAI, OpenAIError
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.repositories.care_log_mock_repository import CareLogRecord, get_care_logs_for_day
+from app.core.time import day_bounds, to_app_timezone
+from app.models.records import CareLog
+from app.models.user import User
+from app.repositories import calendar_repository
 from app.schemas.ai import (
     AskResponse,
     DailySummaryResponse,
@@ -18,6 +23,7 @@ from app.schemas.ai import (
     FeedingRecord,
     SleepRecord,
 )
+from app.services.records import require_baby_access
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +48,17 @@ MEDICAL_KEYWORDS = [
 RECORD_TYPE_LABELS = {"feeding": "수유", "sleep": "수면", "diaper": "배변"}
 
 
-def generate_daily_summary(baby_id: str, target_date: date) -> DailySummaryResponse:
-    records = get_care_logs_for_day(baby_id, target_date)
+@dataclass(frozen=True)
+class CareLogRecord:
+    type: str
+    time: str
+    note: str
+
+
+def generate_daily_summary(
+    db: Session, *, user: User, baby_id: int, target_date: date
+) -> DailySummaryResponse:
+    records = _get_daily_records(db, user=user, baby_id=baby_id, target_date=target_date)
     highlights = _build_highlights(records)
     rule_based_summary = _build_rule_based_summary(records)
 
@@ -80,7 +95,15 @@ def generate_daily_summary(baby_id: str, target_date: date) -> DailySummaryRespo
     )
 
 
-def answer_question(baby_id: str, target_date: date, question: str) -> AskResponse:
+def answer_question(
+    db: Session,
+    *,
+    user: User,
+    baby_id: int,
+    target_date: date,
+    question: str,
+) -> AskResponse:
+    records = _get_daily_records(db, user=user, baby_id=baby_id, target_date=target_date)
     if _is_medical_question(question):
         return AskResponse(
             answer=MEDICAL_RESTRICTED_ANSWER,
@@ -89,7 +112,6 @@ def answer_question(baby_id: str, target_date: date, question: str) -> AskRespon
             source="restricted",
         )
 
-    records = get_care_logs_for_day(baby_id, target_date)
     if not records:
         return AskResponse(
             answer=NO_RECORD_ANSWER,
@@ -126,6 +148,48 @@ def answer_question(baby_id: str, target_date: date, question: str) -> AskRespon
         isMedicalRestricted=False,
         source="ai",
     )
+
+
+def _get_daily_records(
+    db: Session, *, user: User, baby_id: int, target_date: date
+) -> list[CareLogRecord]:
+    require_baby_access(db, baby_id, user)
+    start_at, end_at = day_bounds(target_date)
+    logs = calendar_repository.list_logs_in_range(
+        db,
+        baby_id=baby_id,
+        start_at=start_at,
+        end_at=end_at,
+    )
+    return [_to_ai_record(log) for log in logs]
+
+
+def _to_ai_record(log: CareLog) -> CareLogRecord:
+    record_type = {
+        "FEEDING": "feeding",
+        "SLEEP": "sleep",
+        "URINE": "diaper",
+        "STOOL": "diaper",
+    }.get(log.log_type, log.log_type.lower())
+    occurred_at = to_app_timezone(log.occurred_at)
+    time = occurred_at.strftime("%H:%M") if occurred_at is not None else ""
+    return CareLogRecord(type=record_type, time=time, note=_care_log_note(log))
+
+
+def _care_log_note(log: CareLog) -> str:
+    if log.memo:
+        return log.memo
+    if log.log_type == "FEEDING":
+        parts = [log.feeding_type or "수유"]
+        if log.amount_ml is not None:
+            parts.append(f"{log.amount_ml}ml")
+        return " ".join(parts)
+    if log.log_type == "SLEEP":
+        if log.started_at is not None and log.ended_at is not None:
+            minutes = max(0, round((log.ended_at - log.started_at).total_seconds() / 60))
+            return f"수면 {minutes}분"
+        return "수면"
+    return "소변" if log.log_type == "URINE" else "대변"
 
 
 def _is_medical_question(question: str) -> bool:

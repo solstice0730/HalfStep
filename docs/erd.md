@@ -297,7 +297,7 @@ erDiagram
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | id | BIGINT | 아기 PK |
-| owner_user_id | BIGINT | 최초 등록한 보호자 |
+| owner_user_id | BIGINT | 아기 소유 사용자 |
 | name | VARCHAR | 아기 이름 |
 | birth_date | DATE | 생년월일 |
 | gender | VARCHAR | 성별 |
@@ -307,28 +307,7 @@ erDiagram
 
 ---
 
-### 4.3 baby_caregivers
-
-한 아기를 여러 보호자가 함께 관리할 수 있도록 연결한다.
-
-| 컬럼 | 타입 | 설명 |
-| --- | --- | --- |
-| id | BIGINT | PK |
-| baby_id | BIGINT | 아기 ID |
-| user_id | BIGINT | 사용자 ID |
-| role | VARCHAR | OWNER, CAREGIVER |
-| relation | VARCHAR | 엄마, 아빠, 할머니 등 |
-| created_at | DATETIME | 생성일 |
-
-제약 조건:
-
-```text
-UNIQUE(baby_id, user_id)
-```
-
----
-
-### 4.4 care_logs
+### 4.3 care_logs
 
 수유, 수면, 소변, 대변, 이유식 기록을 통합 저장한다.
 
@@ -346,7 +325,7 @@ UNIQUE(baby_id, user_id)
 | diaper_type | VARCHAR | 소변, 대변 상태 |
 | baby_food_name | VARCHAR | 이유식 이름 |
 | memo | TEXT | 메모 |
-| extra_data | JSON | 추가 데이터 |
+| extra_data | JSON | 수유 시간·좌우·트림, 수면 종류·상태, 배뇨/배변 양·색상·형태·사진 URL |
 | created_at | DATETIME | 생성일 |
 | updated_at | DATETIME | 수정일 |
 
@@ -360,9 +339,18 @@ STOOL
 BABY_FOOD
 ```
 
+MVP 입력 규칙:
+
+| 기록 | 필수 입력 | 선택 입력 |
+| --- | --- | --- |
+| 수유 | 시간, 방식, 수유량 또는 수유 시간 | 좌우, 트림, 메모 |
+| 수면 | 시작 시간, 종료 시간 | 낮잠/밤잠, 상태 |
+| 소변 | 시간 | 양, 색상 |
+| 대변 | 시간 | 양, 색상, 형태, 사진 URL |
+
 ---
 
-### 4.5 diaries
+### 4.4 diaries
 
 직접 작성한 일기 또는 AI가 생성한 일기를 저장한다.
 
@@ -381,7 +369,7 @@ BABY_FOOD
 
 ---
 
-### 4.6 diary_photos
+### 4.5 diary_photos
 
 일기에 첨부된 사진을 저장한다.
 
@@ -395,7 +383,7 @@ BABY_FOOD
 
 ---
 
-### 4.7 ai_daily_summaries
+### 4.6 ai_daily_summaries
 
 하루 기록 기반 AI 요약 결과를 저장한다.
 
@@ -418,7 +406,7 @@ UNIQUE(baby_id, summary_date)
 
 ---
 
-### 4.8 calendar_events
+### 4.7 calendar_events
 
 캘린더에 표시할 일정을 저장한다.
 
@@ -439,7 +427,7 @@ UNIQUE(baby_id, summary_date)
 
 ---
 
-### 4.9 family_rooms
+### 4.8 family_rooms
 
 가족방 정보를 저장한다.
 
@@ -461,7 +449,7 @@ UNIQUE(invite_code)
 
 ---
 
-### 4.10 family_room_members
+### 4.9 family_room_members
 
 가족방 구성원을 저장한다.
 
@@ -481,7 +469,7 @@ UNIQUE(family_room_id, user_id)
 
 ---
 
-### 4.11 family_posts
+### 4.10 family_posts
 
 가족방 피드 게시글을 저장한다.
 
@@ -497,7 +485,7 @@ UNIQUE(family_room_id, user_id)
 
 ---
 
-### 4.12 family_comments
+### 4.11 family_comments
 
 가족방 게시글 댓글을 저장한다.
 
@@ -512,13 +500,14 @@ UNIQUE(family_room_id, user_id)
 
 ---
 
-### 4.13 community_categories
+### 4.12 community_categories
 
 커뮤니티 게시판 카테고리를 저장한다.
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | id | BIGINT | 카테고리 PK |
+| code | VARCHAR | API에서 사용하는 고유 카테고리 코드 |
 | name | VARCHAR | 카테고리 이름 |
 | description | TEXT | 설명 |
 | sort_order | INT | 정렬 순서 |
@@ -540,7 +529,7 @@ UNIQUE(family_room_id, user_id)
 
 ---
 
-### 4.14 community_posts
+### 4.13 community_posts
 
 커뮤니티 게시글을 저장한다.
 
@@ -551,6 +540,8 @@ UNIQUE(family_room_id, user_id)
 | user_id | BIGINT | 작성자 ID |
 | title | VARCHAR | 제목 |
 | content | TEXT | 본문 |
+| image_urls | JSON | 첨부 이미지 URL 목록, 최대 5개 |
+| baby_age_months | SMALLINT | 작성 시점 아기 월령, 0~24개월, 월령 무관은 NULL |
 | is_anonymous | BOOLEAN | 익명 여부 |
 | view_count | INT | 조회수 |
 | created_at | DATETIME | 생성일 |
@@ -558,9 +549,11 @@ UNIQUE(family_room_id, user_id)
 
 ---
 
-### 4.15 community_comments
+### 4.14 community_comments
 
 커뮤니티 댓글을 저장한다.
+
+> 현재 커뮤니티 MVP에서는 생성하지 않으며 댓글 기능 구현 시 migration을 추가한다.
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
@@ -575,7 +568,7 @@ UNIQUE(family_room_id, user_id)
 
 ---
 
-### 4.16 chat_sessions
+### 4.15 chat_sessions
 
 AI 챗봇 대화 세션을 저장한다.
 
@@ -590,7 +583,7 @@ AI 챗봇 대화 세션을 저장한다.
 
 ---
 
-### 4.17 chat_messages
+### 4.16 chat_messages
 
 AI 챗봇 메시지를 저장한다.
 
@@ -628,7 +621,6 @@ notifications
 
 ```text
 users 1 : N babies
-users N : M babies through baby_caregivers
 
 babies 1 : N care_logs
 babies 1 : N diaries
