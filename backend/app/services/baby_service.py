@@ -4,6 +4,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.baby import Baby
+from app.core.time import day_bounds
+from app.repositories import calendar_repository
 from app.repositories.baby_repository import (
     activate_baby,
     create_baby,
@@ -14,6 +16,7 @@ from app.repositories.baby_repository import (
     update_baby,
 )
 from app.utils.date_utils import age_in_days, age_in_months
+from app.services import records as records_service
 
 
 def get_my_babies(db: Session, user_id: int) -> list[Baby]:
@@ -72,6 +75,11 @@ def get_dashboard(db: Session, user_id: int, baby_id: int | None) -> dict:
                 detail="No active baby profile. Please create one first.",
             )
 
+    start_at, end_at = day_bounds(records_service.current_date())
+    today_logs = calendar_repository.list_logs_in_range(
+        db, baby_id=baby.id, start_at=start_at, end_at=end_at
+    )
+
     return {
         "baby": {
             "id": baby.id,
@@ -79,15 +87,7 @@ def get_dashboard(db: Session, user_id: int, baby_id: int | None) -> dict:
             "ageInDays": age_in_days(baby.birth_date),
             "ageInMonths": age_in_months(baby.birth_date),
         },
-        "todaySummary": {
-            # TODO: care_logs 구현 후 실제 집계로 교체
-            "feedingCount": 0,
-            "sleepTotalMinutes": 0,
-            "urineCount": 0,
-            "stoolCount": 0,
-            "lastFeedingAt": None,
-            "lastSleepAt": None,
-        },
+        "todaySummary": records_service.summarize_logs(today_logs),
         "aiSummary": None,
         "curationCards": [],
         "activeTimer": None,

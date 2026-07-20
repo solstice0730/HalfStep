@@ -1,8 +1,9 @@
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import * as ImagePicker from "expo-image-picker";
-import { Camera, ImagePlus, PenLine, Save, X } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Camera, ImagePlus, PenLine, RefreshCw, Save, X } from "lucide-react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Image,
@@ -20,11 +21,17 @@ import {
   TouchableWithoutFeedback,
   View
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { StoryCarousel } from "../components/DiaryCarousel";
+import { env } from "@/config/env";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
+import { recordsApi } from "@/services/api/recordsApi";
 import { colors } from "@/shared/constants/colors";
+import type { CareRecord } from "../types/records";
+import { describeRecord, formatRecordDate, formatRecordTime, recordTypeLabels } from "../utils/recordPresentation";
 
 type RecordsScreenProps = BottomTabScreenProps<MainTabParamList, "Records">;
 
@@ -35,9 +42,15 @@ export type Story = {
   summary: string[];
 };
 
-const calendarDays = Array.from({ length: 30 }, (_, index) => index + 1);
+const currentDate = new Date();
+const calendarYear = currentDate.getFullYear();
+const calendarMonthIndex = currentDate.getMonth();
+const calendarDays = Array.from(
+  { length: new Date(calendarYear, calendarMonthIndex + 1, 0).getDate() },
+  (_, index) => index + 1
+);
 const screenWidth = Dimensions.get("window").width;
-const todayDate = 20;
+const todayDate = currentDate.getDate();
 const samplePhoto = "https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1200&auto=format&fit=crop";
 
 const initialStories: Record<number, Story> = {
@@ -74,6 +87,7 @@ const initialStories: Record<number, Story> = {
 };
 
 export function RecordsScreen({ route }: RecordsScreenProps) {
+  const { accessToken } = useAuth();
   const [stories, setStories] = useState<Record<number, Story>>(initialStories);
   const [selectedDate, setSelectedDate] = useState(todayDate);
   const [storyOpen, setStoryOpen] = useState(false);
@@ -83,9 +97,50 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
   const [draftImageUri, setDraftImageUri] = useState<string | undefined>();
   const processedCameraUri = useRef<string | undefined>(undefined);
   const previewTranslateX = useRef(new Animated.Value(0)).current;
+  const recordsRequestId = useRef(0);
+  const [records, setRecords] = useState<CareRecord[]>([]);
+  const [recordsLoading, setRecordsLoading] = useState(true);
+  const [recordsError, setRecordsError] = useState<string | null>(null);
 
   const selectedStory = stories[selectedDate];
   const storyDates = useMemo(() => calendarDays.filter((date) => stories[date]), [stories]);
+  const selectedDateQuery = formatRecordDate(calendarYear, calendarMonthIndex, selectedDate);
+
+  const loadRecords = useCallback(async () => {
+    const requestId = ++recordsRequestId.current;
+    if (!accessToken) {
+      setRecords([]);
+      setRecordsLoading(false);
+      setRecordsError("로그인이 필요합니다.");
+      return;
+    }
+    setRecordsLoading(true);
+    setRecordsError(null);
+    try {
+      const result = await recordsApi.list(accessToken, {
+        babyId: env.demoBabyId,
+        date: selectedDateQuery,
+        limit: 50
+      });
+      if (requestId === recordsRequestId.current) setRecords(result.records);
+    } catch (error) {
+      if (requestId === recordsRequestId.current) {
+        setRecords([]);
+        setRecordsError(error instanceof Error ? error.message : "기록을 불러오지 못했습니다.");
+      }
+    } finally {
+      if (requestId === recordsRequestId.current) setRecordsLoading(false);
+    }
+  }, [accessToken, selectedDateQuery]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadRecords();
+      return () => {
+        recordsRequestId.current += 1;
+      };
+    }, [loadRecords])
+  );
 
   useEffect(() => {
     const uri = route.params?.draftImageUri;
@@ -243,7 +298,7 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
         <SafeAreaView edges={["top"]} style={styles.fixedArea}>
           <View style={styles.topNav}>
             <View style={styles.titleBlock}>
-              <Text style={styles.navEyebrow}>2026년 6월</Text>
+              <Text style={styles.navEyebrow}>{calendarYear}년 {calendarMonthIndex + 1}월</Text>
               <Text style={styles.navTitle}>성장 기록</Text>
             </View>
             <Pressable style={styles.diaryButton} onPress={() => openEditor()}>
@@ -252,10 +307,10 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
             </Pressable>
           </View>
 
-          <View style={styles.fixedContent}>
+          <ScrollView contentContainerStyle={styles.fixedContent} showsVerticalScrollIndicator={false}>
             <View style={styles.calendarCard}>
               <View style={styles.calendarHeader}>
-                <Text style={styles.monthTitle}>6월 기록 캘린더</Text>
+                <Text style={styles.monthTitle}>{calendarMonthIndex + 1}월 기록 캘린더</Text>
                 <View style={styles.photoBadge}>
                   <Camera color={colors.primary} size={14} />
                   <Text style={styles.photoBadgeText}>사진 일기</Text>
@@ -305,6 +360,45 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
               </View>
             </View>
 
+            <View style={styles.recordsPanel}>
+              <View style={styles.recordsHeader}>
+                <View>
+                  <Text style={styles.recordsTitle}>{calendarMonthIndex + 1}월 {selectedDate}일 육아 기록</Text>
+                  <Text style={styles.recordsCount}>{records.length}개 저장됨</Text>
+                </View>
+                <Pressable accessibilityLabel="기록 새로고침" disabled={recordsLoading} style={styles.refreshButton} onPress={loadRecords}>
+                  <RefreshCw color={colors.primary} size={17} />
+                </Pressable>
+              </View>
+              {recordsLoading ? (
+                <View style={styles.recordsState}>
+                  <ActivityIndicator color={colors.primary} />
+                  <Text style={styles.recordsStateText}>저장된 기록을 불러오는 중</Text>
+                </View>
+              ) : recordsError ? (
+                <View style={styles.recordsState}>
+                  <Text style={styles.recordsStateText}>{recordsError}</Text>
+                  <Pressable style={styles.retryButton} onPress={loadRecords}>
+                    <Text style={styles.retryButtonText}>다시 시도</Text>
+                  </Pressable>
+                </View>
+              ) : records.length === 0 ? (
+                <View style={styles.recordsState}>
+                  <Text style={styles.recordsStateText}>이 날짜에 저장된 육아 기록이 없습니다.</Text>
+                </View>
+              ) : (
+                records.map((record) => (
+                  <View key={record.id} style={styles.recordRow}>
+                    <Text style={styles.recordTime}>{formatRecordTime(record.occurredAt)}</Text>
+                    <View style={styles.recordBody}>
+                      <Text style={styles.recordType}>{recordTypeLabels[record.type]}</Text>
+                      <Text style={styles.recordDescription}>{describeRecord(record)}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+
             <Animated.View
               style={[styles.previewSwipeWrap, { transform: [{ translateX: previewTranslateX }] }]}
               {...previewPanResponder.panHandlers}
@@ -313,7 +407,7 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
                 {selectedStory ? (
                   <ImageBackground imageStyle={styles.previewImage} source={{ uri: selectedStory.image }} style={styles.previewImageBox}>
                     <View style={styles.previewOverlay}>
-                      <Text style={styles.previewDate}>6월 {selectedDate}일</Text>
+                      <Text style={styles.previewDate}>{calendarMonthIndex + 1}월 {selectedDate}일</Text>
                       <Text style={styles.previewTitle}>{selectedStory.title}</Text>
                       <Text numberOfLines={2} style={styles.previewText}>{selectedStory.text}</Text>
                     </View>
@@ -327,7 +421,7 @@ export function RecordsScreen({ route }: RecordsScreenProps) {
                 )}
               </Pressable>
             </Animated.View>
-          </View>
+          </ScrollView>
         </SafeAreaView>
       )}
 
@@ -443,11 +537,86 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   fixedContent: {
-    flex: 1,
+    flexGrow: 1,
     gap: 14,
     paddingBottom: 14,
     paddingHorizontal: 20,
     paddingTop: 14
+  },
+  recordsPanel: {
+    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14
+  },
+  recordsHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  recordsTitle: {
+    color: colors.primaryDark,
+    fontSize: 16,
+    fontWeight: "900"
+  },
+  recordsCount: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 3
+  },
+  refreshButton: {
+    alignItems: "center",
+    height: 36,
+    justifyContent: "center",
+    width: 36
+  },
+  recordsState: {
+    alignItems: "center",
+    gap: 8,
+    minHeight: 72,
+    justifyContent: "center",
+    paddingVertical: 14
+  },
+  recordsStateText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    textAlign: "center"
+  },
+  retryButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 7
+  },
+  retryButtonText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  recordRow: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    paddingVertical: 11
+  },
+  recordTime: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+    width: 38
+  },
+  recordBody: {
+    flex: 1
+  },
+  recordType: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  recordDescription: {
+    color: colors.text,
+    fontSize: 14,
+    marginTop: 2
   },
   calendarCard: {
     backgroundColor: "#FFFFFF",
