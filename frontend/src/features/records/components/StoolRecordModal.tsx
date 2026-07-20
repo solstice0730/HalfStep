@@ -1,6 +1,7 @@
+import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { X } from "lucide-react-native";
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { ImagePlus, X } from "lucide-react-native";
 
 import { TimePickerField, nowAsTimeValue, type TimeValue } from "@/features/records/components/TimePickerField";
 import {
@@ -17,7 +18,13 @@ interface StoolRecordModalProps {
   visible: boolean;
   isSaving: boolean;
   onClose: () => void;
-  onSave: (record: { time: TimeValue; amount: DiaperAmount; color: StoolColor; form: StoolForm }) => Promise<boolean>;
+  onSave: (record: {
+    time: TimeValue;
+    amount: DiaperAmount;
+    color: StoolColor;
+    form: StoolForm;
+    photo?: ImagePicker.ImagePickerAsset;
+  }) => Promise<boolean>;
 }
 
 const AMOUNTS = Object.keys(DIAPER_AMOUNT_LABELS) as DiaperAmount[];
@@ -29,14 +36,23 @@ export function StoolRecordModal({ visible, isSaving, onClose, onSave }: StoolRe
   const [amount, setAmount] = useState<DiaperAmount>("MEDIUM");
   const [color, setColor] = useState<StoolColor>("NORMAL");
   const [form, setForm] = useState<StoolForm>("NORMAL");
+  const [photo, setPhoto] = useState<ImagePicker.ImagePickerAsset | undefined>();
 
   const isValid = time.hour !== "" && time.minute !== "";
 
   const handleSave = async () => {
     if (!isValid || isSaving) return;
-    if (await onSave({ time, amount, color, form })) {
+    if (await onSave({ time, amount, color, form, photo })) {
       setTime(nowAsTimeValue());
+      setPhoto(undefined);
     }
+  };
+
+  const pickPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.9 });
+    if (!result.canceled) setPhoto(result.assets[0]);
   };
 
   return (
@@ -96,6 +112,21 @@ export function StoolRecordModal({ visible, isSaving, onClose, onSave }: StoolRe
               </Pressable>
             ))}
           </View>
+
+          <Text style={styles.label}>사진 (선택)</Text>
+          {photo ? (
+            <View style={styles.photoWrap}>
+              <Image source={{ uri: photo.uri }} resizeMode="cover" style={styles.photo} />
+              <Pressable accessibilityLabel="사진 삭제" onPress={() => setPhoto(undefined)} style={styles.photoRemove}>
+                <X color="#FFFFFF" size={15} />
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable accessibilityLabel="대변 사진 추가" onPress={() => void pickPhoto()} style={styles.photoPicker}>
+              <ImagePlus color={colors.primary} size={22} />
+              <Text style={styles.photoPickerText}>사진 추가</Text>
+            </Pressable>
+          )}
 
           <View style={styles.actionRow}>
             <Pressable style={styles.cancelButton} onPress={onClose}>
@@ -162,6 +193,45 @@ const styles = StyleSheet.create({
   },
   segmentTextActive: {
     color: "#FFFFFF"
+  },
+  photoWrap: {
+    height: 112,
+    position: "relative",
+    width: 112
+  },
+  photo: {
+    borderRadius: 12,
+    height: 112,
+    width: 112
+  },
+  photoRemove: {
+    alignItems: "center",
+    backgroundColor: "rgba(45,37,32,0.7)",
+    borderRadius: 999,
+    height: 26,
+    justifyContent: "center",
+    position: "absolute",
+    right: 5,
+    top: 5,
+    width: 26
+  },
+  photoPicker: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderStyle: "dashed",
+    borderWidth: 1,
+    gap: 5,
+    height: 96,
+    justifyContent: "center",
+    width: 112
+  },
+  photoPickerText: {
+    color: colors.primaryDark,
+    fontSize: 12,
+    fontWeight: "800"
   },
   actionRow: {
     flexDirection: "row",

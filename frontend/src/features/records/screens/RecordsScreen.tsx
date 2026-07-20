@@ -46,6 +46,7 @@ import type { AppStackParamList } from "@/navigation/AppStackNavigator";
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { AiRequestError, generateDiary } from "@/services/api/aiApi";
 import { ApiRequestError } from "@/services/api/apiClient";
+import { uploadImage, type LocalImage } from "@/services/api/uploadApi";
 import { ErrorState } from "@/shared/components/ErrorState";
 import { LoadingState } from "@/shared/components/LoadingState";
 import { colors } from "@/shared/constants/colors";
@@ -147,14 +148,24 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
     }));
   };
 
-  const handleSaveStool = async (record: { time: TimeValue; amount: DiaperAmount; color: StoolColor; form: StoolForm }) => {
+  const handleSaveStool = async (record: {
+    time: TimeValue;
+    amount: DiaperAmount;
+    color: StoolColor;
+    form: StoolForm;
+    photo?: LocalImage;
+  }) => {
     if (!accessToken || !activeBaby || saveStatus === "loading") return false;
-    return saveRecord(() => addStoolRecord(accessToken, activeBaby.id, {
-      occurredAt: buildIsoDateTime(selectedDate, record.time),
-      amount: record.amount,
-      color: record.color,
-      form: record.form
-    }));
+    return saveRecord(async () => {
+      const photoUrl = record.photo ? await uploadImage(accessToken, record.photo) : undefined;
+      return addStoolRecord(accessToken, activeBaby.id, {
+        occurredAt: buildIsoDateTime(selectedDate, record.time),
+        amount: record.amount,
+        color: record.color,
+        form: record.form,
+        photoUrl
+      });
+    });
   };
 
   const saveRecord = async (request: () => Promise<unknown>): Promise<boolean> => {
