@@ -201,7 +201,7 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
     if (!canGenerate || !accessToken || !activeBaby || aiStatus === "loading") return;
 
     const request: DiaryGenerationRequest = {
-      baby: { name: activeBaby.name, ageMonths: Math.floor(activeBaby.ageInDays / 30) },
+      baby: { name: activeBaby.name, ageMonths: Math.max(0, Math.floor(activeBaby.ageInDays / 30)) },
       date: selectedDate,
       records: {
         feeding: todayRecords.feeding.map((record) => ({

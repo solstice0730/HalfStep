@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 
 
 def age_in_days(birth_date: date) -> int:
-    return (datetime.now(timezone.utc).date() - birth_date).days
+    return max(0, (datetime.now(timezone.utc).date() - birth_date).days)
 
 
 def age_in_months(birth_date: date) -> int:

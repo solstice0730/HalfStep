@@ -1,5 +1,5 @@
 import unittest
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -12,6 +12,7 @@ from app.db.base import Base
 from app.main import app
 from app.models.baby import Baby
 from app.models.user import User
+from app.utils.date_utils import age_in_days
 
 
 class BabyApiTest(unittest.TestCase):
@@ -85,6 +86,21 @@ class BabyApiTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+    def test_future_birth_date_is_rejected(self) -> None:
+        response = self.client.post(
+            '/api/babies',
+            json={
+                'name': 'Future',
+                'birthDate': (date.today() + timedelta(days=1)).isoformat(),
+                'gender': 'UNKNOWN',
+            },
+        )
+
+        self.assertEqual(response.status_code, 422, response.text)
+
+    def test_age_in_days_never_returns_a_negative_value(self) -> None:
+        self.assertEqual(age_in_days(date.today() + timedelta(days=1)), 0)
 
     def test_settings_ignore_compose_helper_variables(self) -> None:
         settings = Settings(mysql_host="mysql", mysql_port=3306)
