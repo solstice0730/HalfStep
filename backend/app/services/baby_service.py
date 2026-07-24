@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.baby import Baby
 from app.core.time import day_bounds
-from app.repositories import calendar_repository
+from app.repositories import calendar_repository, records_repository
 from app.repositories.baby_repository import (
     activate_baby,
     create_baby,
@@ -60,6 +60,7 @@ def activate_baby_profile(db: Session, user_id: int, baby_id: int) -> Baby:
 
 def delete_baby_profile(db: Session, user_id: int, baby_id: int) -> None:
     baby = _get_owned_baby(db, user_id, baby_id)
+    records_repository.delete_logs_for_baby(db, baby_id=baby.id)
     delete_baby(db, baby)
     db.commit()
 

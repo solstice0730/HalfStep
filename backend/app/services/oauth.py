@@ -58,6 +58,12 @@ def exchange_oauth_code(
     redirect_uri: str,
     code_verifier: str | None,
 ) -> str:
+    if provider == 'kakao' and not settings.KAKAO_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail='Kakao Login requires KAKAO_CLIENT_SECRET on the backend.',
+        )
+
     if provider == "google":
         return _exchange_code(
             token_url="https://oauth2.googleapis.com/token",

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { X } from "lucide-react-native";
 
 import { TimePickerField, nowAsTimeValue, timeValueToMinutes, type TimeValue } from "@/features/records/components/TimePickerField";
@@ -7,11 +7,12 @@ import { colors } from "@/shared/constants/colors";
 
 interface SleepRecordModalProps {
   visible: boolean;
+  isSaving: boolean;
   onClose: () => void;
-  onSave: (record: { start: TimeValue; end: TimeValue }) => void;
+  onSave: (record: { start: TimeValue; end: TimeValue }) => Promise<boolean>;
 }
 
-export function SleepRecordModal({ visible, onClose, onSave }: SleepRecordModalProps) {
+export function SleepRecordModal({ visible, isSaving, onClose, onSave }: SleepRecordModalProps) {
   const [start, setStart] = useState<TimeValue>(nowAsTimeValue());
   const [end, setEnd] = useState<TimeValue>(nowAsTimeValue());
 
@@ -19,11 +20,12 @@ export function SleepRecordModal({ visible, onClose, onSave }: SleepRecordModalP
   const endBeforeStart = hasBothTimes && timeValueToMinutes(end) <= timeValueToMinutes(start);
   const isValid = hasBothTimes && !endBeforeStart;
 
-  const handleSave = () => {
-    if (!isValid) return;
-    onSave({ start, end });
-    setStart(nowAsTimeValue());
-    setEnd(nowAsTimeValue());
+  const handleSave = async () => {
+    if (!isValid || isSaving) return;
+    if (await onSave({ start, end })) {
+      setStart(nowAsTimeValue());
+      setEnd(nowAsTimeValue());
+    }
   };
 
   return (
@@ -48,8 +50,8 @@ export function SleepRecordModal({ visible, onClose, onSave }: SleepRecordModalP
             <Pressable style={styles.cancelButton} onPress={onClose}>
               <Text style={styles.cancelButtonText}>취소</Text>
             </Pressable>
-            <Pressable disabled={!isValid} style={[styles.saveButton, !isValid && styles.saveButtonDisabled]} onPress={handleSave}>
-              <Text style={styles.saveButtonText}>저장</Text>
+            <Pressable disabled={!isValid || isSaving} style={[styles.saveButton, (!isValid || isSaving) && styles.saveButtonDisabled]} onPress={handleSave}>
+              {isSaving ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.saveButtonText}>저장</Text>}
             </Pressable>
           </View>
         </View>

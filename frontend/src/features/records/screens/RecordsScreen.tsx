@@ -20,6 +20,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useBaby } from "@/features/baby/hooks/useBaby";
 import { FeedingRecordModal } from "@/features/records/components/FeedingRecordModal";
 import { PhotoPicker, type RecordPhoto } from "@/features/records/components/PhotoPicker";
 import { SleepRecordModal } from "@/features/records/components/SleepRecordModal";
@@ -32,7 +33,6 @@ import {
   DIAPER_AMOUNT_LABELS,
   FEEDING_TYPE_LABELS,
   STOOL_FORM_LABELS,
-  type BabyInfo,
   type BreastSide,
   type DiaperAmount,
   type DiaryGenerationRequest,
@@ -45,6 +45,8 @@ import {
 import type { AppStackParamList } from "@/navigation/AppStackNavigator";
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { AiRequestError, generateDiary } from "@/services/api/aiApi";
+import { ApiRequestError } from "@/services/api/apiClient";
+import { uploadImage, type LocalImage } from "@/services/api/uploadApi";
 import { ErrorState } from "@/shared/components/ErrorState";
 import { LoadingState } from "@/shared/components/LoadingState";
 import { colors } from "@/shared/constants/colors";
@@ -55,10 +57,8 @@ type RecordsScreenProps = CompositeScreenProps<
 >;
 
 const todayIsoDate = () => new Date().toISOString().slice(0, 10);
-const todayDisplayDate = () =>
-  new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
-// Baby 프로필 API(#7)가 붙기 전까지 쓰는 임시 아기 정보. HomeScreen의 demo baby와 짝을 맞춘다.
-const DEMO_BABY: BabyInfo = { name: "리몽이", ageMonths: 1 };
+const displayDate = (date: string) =>
+  new Date(`${date}T00:00:00`).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
 
 const pad2 = (value: string) => (value || "0").padStart(2, "0");
 const buildIsoDateTime = (date: string, time: TimeValue) => `${date}T${pad2(time.hour)}:${pad2(time.minute)}:00`;
@@ -68,9 +68,10 @@ type AsyncStatus = "idle" | "loading" | "error";
 
 export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
   const { accessToken, signOut } = useAuth();
+  const { activeBaby } = useBaby();
   const processedCameraUri = useRef<string | undefined>(undefined);
 
-  const todayIso = todayIsoDate();
+  const selectedDate = route.params?.selectedDate ?? todayIsoDate();
   const [recordsStatus, setRecordsStatus] = useState<AsyncStatus>("loading");
   const [todayRecords, setTodayRecords] = useState<TodayRecords>({ feeding: [], sleep: [], urine: [], stool: [] });
   const [activeRecordModal, setActiveRecordModal] = useState<ActiveModal>(null);
@@ -78,23 +79,25 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
   const [memo, setMemo] = useState("");
   const [aiStatus, setAiStatus] = useState<AsyncStatus>("idle");
   const [aiError, setAiError] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<AsyncStatus>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const loadTodayRecords = useCallback(async () => {
-    if (!accessToken) return;
+    if (!accessToken || !activeBaby) return;
     setRecordsStatus("loading");
     try {
-      const records = await getTodayRecords(accessToken, todayIso);
+      const records = await getTodayRecords(accessToken, activeBaby.id, selectedDate);
       setTodayRecords(records);
       setRecordsStatus("idle");
     } catch (error) {
-      if (error instanceof AiRequestError && error.kind === "auth") {
+      if (error instanceof ApiRequestError && error.kind === "auth") {
         await signOut();
         return;
       }
       setRecordsStatus("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, todayIso]);
+  }, [accessToken, activeBaby, selectedDate, signOut]);
 
   useFocusEffect(
     useCallback(() => {
@@ -119,48 +122,70 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
   }, [route.params?.openRecordModal, navigation]);
 
   const handleSaveFeeding = async (record: { time: TimeValue; feedingType: FeedingType; amountMl?: number; durationMinutes?: number }) => {
-    if (!accessToken) return;
-    await addFeedingRecord(accessToken, {
-      occurredAt: buildIsoDateTime(todayIso, record.time),
+    if (!accessToken || !activeBaby || saveStatus === "loading") return false;
+    return saveRecord(() => addFeedingRecord(accessToken, activeBaby.id, {
+      occurredAt: buildIsoDateTime(selectedDate, record.time),
       feedingType: record.feedingType,
       amountMl: record.amountMl,
       durationMinutes: record.durationMinutes
-    });
-    await loadTodayRecords();
-    setActiveRecordModal(null);
+    }));
   };
 
   const handleSaveSleep = async (record: { start: TimeValue; end: TimeValue }) => {
-    if (!accessToken) return;
-    await addSleepRecord(accessToken, {
-      startedAt: buildIsoDateTime(todayIso, record.start),
-      endedAt: buildIsoDateTime(todayIso, record.end)
-    });
-    await loadTodayRecords();
-    setActiveRecordModal(null);
+    if (!accessToken || !activeBaby || saveStatus === "loading") return false;
+    return saveRecord(() => addSleepRecord(accessToken, activeBaby.id, {
+      startedAt: buildIsoDateTime(selectedDate, record.start),
+      endedAt: buildIsoDateTime(selectedDate, record.end)
+    }));
   };
 
   const handleSaveUrine = async (record: { time: TimeValue; amount: DiaperAmount; color: UrineColor }) => {
-    if (!accessToken) return;
-    await addUrineRecord(accessToken, {
-      occurredAt: buildIsoDateTime(todayIso, record.time),
+    if (!accessToken || !activeBaby || saveStatus === "loading") return false;
+    return saveRecord(() => addUrineRecord(accessToken, activeBaby.id, {
+      occurredAt: buildIsoDateTime(selectedDate, record.time),
       amount: record.amount,
       color: record.color
-    });
-    await loadTodayRecords();
-    setActiveRecordModal(null);
+    }));
   };
 
-  const handleSaveStool = async (record: { time: TimeValue; amount: DiaperAmount; color: StoolColor; form: StoolForm }) => {
-    if (!accessToken) return;
-    await addStoolRecord(accessToken, {
-      occurredAt: buildIsoDateTime(todayIso, record.time),
-      amount: record.amount,
-      color: record.color,
-      form: record.form
+  const handleSaveStool = async (record: {
+    time: TimeValue;
+    amount: DiaperAmount;
+    color: StoolColor;
+    form: StoolForm;
+    photo?: LocalImage;
+  }) => {
+    if (!accessToken || !activeBaby || saveStatus === "loading") return false;
+    return saveRecord(async () => {
+      const photoUrl = record.photo ? await uploadImage(accessToken, record.photo) : undefined;
+      return addStoolRecord(accessToken, activeBaby.id, {
+        occurredAt: buildIsoDateTime(selectedDate, record.time),
+        amount: record.amount,
+        color: record.color,
+        form: record.form,
+        photoUrl
+      });
     });
-    await loadTodayRecords();
-    setActiveRecordModal(null);
+  };
+
+  const saveRecord = async (request: () => Promise<unknown>): Promise<boolean> => {
+    setSaveStatus("loading");
+    setSaveError(null);
+    try {
+      await request();
+      await loadTodayRecords();
+      setSaveStatus("idle");
+      setActiveRecordModal(null);
+      return true;
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.kind === "auth") {
+        await signOut();
+        return false;
+      }
+      setSaveStatus("error");
+      setSaveError(error instanceof ApiRequestError ? error.message : "기록을 저장하지 못했어요. 다시 시도해 주세요.");
+      return false;
+    }
   };
 
   const hasRecords =
@@ -173,11 +198,11 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
   const canGenerate = hasRecords || hasMemo || hasPhotoDescription;
 
   const handleGenerateDiary = async () => {
-    if (!canGenerate || !accessToken || aiStatus === "loading") return;
+    if (!canGenerate || !accessToken || !activeBaby || aiStatus === "loading") return;
 
     const request: DiaryGenerationRequest = {
-      baby: DEMO_BABY,
-      date: todayIso,
+      baby: { name: activeBaby.name, ageMonths: Math.max(0, Math.floor(activeBaby.ageInDays / 30)) },
+      date: selectedDate,
       records: {
         feeding: todayRecords.feeding.map((record) => ({
           recordedAt: record.recordedAt,
@@ -206,7 +231,7 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
       const response = await generateDiary(accessToken, request);
       const photoUris = photos.map((photo) => photo.uri);
       const memoValue = memo.trim() || undefined;
-      navigation.navigate("DiaryResult", { date: todayIso, request, response, photoUris, memo: memoValue });
+      navigation.navigate("DiaryResult", { date: selectedDate, request, response, photoUris, memo: memoValue });
     } catch (error) {
       if (error instanceof AiRequestError && error.kind === "auth") {
         await signOut();
@@ -226,8 +251,8 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
           <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
             <View style={styles.editorFlex}>
               <View style={styles.header}>
-                <Text style={styles.navEyebrow}>{todayDisplayDate()}</Text>
-                <Text style={styles.navTitle}>오늘의 기록</Text>
+                <Text style={styles.navEyebrow}>{displayDate(selectedDate)}</Text>
+                <Text style={styles.navTitle}>{selectedDate === todayIsoDate() ? "오늘의 기록" : "선택한 날짜의 기록"}</Text>
               </View>
 
               <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.editorBody}>
@@ -249,6 +274,8 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
                 {recordsStatus === "loading" && <LoadingState />}
                 {recordsStatus === "error" && <ErrorState message="오늘 기록을 불러오지 못했어요." onRetry={loadTodayRecords} />}
                 {recordsStatus === "idle" && <TodayRecordsList records={todayRecords} />}
+
+                {saveError && <ErrorState message={saveError} />}
 
                 <PhotoPicker
                   onAdd={(uri) => setPhotos((current) => [...current, { uri, description: "" }])}
@@ -301,16 +328,16 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
       </SafeAreaView>
 
       {activeRecordModal === "feeding" && (
-        <FeedingRecordModal onClose={() => setActiveRecordModal(null)} onSave={handleSaveFeeding} visible />
+        <FeedingRecordModal isSaving={saveStatus === "loading"} onClose={() => setActiveRecordModal(null)} onSave={handleSaveFeeding} visible />
       )}
       {activeRecordModal === "sleep" && (
-        <SleepRecordModal onClose={() => setActiveRecordModal(null)} onSave={handleSaveSleep} visible />
+        <SleepRecordModal isSaving={saveStatus === "loading"} onClose={() => setActiveRecordModal(null)} onSave={handleSaveSleep} visible />
       )}
       {activeRecordModal === "urine" && (
-        <UrineRecordModal onClose={() => setActiveRecordModal(null)} onSave={handleSaveUrine} visible />
+        <UrineRecordModal isSaving={saveStatus === "loading"} onClose={() => setActiveRecordModal(null)} onSave={handleSaveUrine} visible />
       )}
       {activeRecordModal === "stool" && (
-        <StoolRecordModal onClose={() => setActiveRecordModal(null)} onSave={handleSaveStool} visible />
+        <StoolRecordModal isSaving={saveStatus === "loading"} onClose={() => setActiveRecordModal(null)} onSave={handleSaveStool} visible />
       )}
     </View>
   );

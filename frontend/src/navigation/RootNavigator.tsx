@@ -8,6 +8,9 @@ import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { AppStackNavigator } from "@/navigation/AppStackNavigator";
 import { colors } from "@/shared/constants/colors";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useBaby } from "@/features/baby/hooks/useBaby";
+import { BabySetupScreen } from "@/features/baby/screens/BabySetupScreen";
+import { ErrorState } from "@/shared/components/ErrorState";
 
 type RootStackParamList = {
   Login: undefined;
@@ -69,6 +72,7 @@ function LoginRoute() {
 
 function MainRoute() {
   const { isAuthenticated, isBootstrapping } = useAuth();
+  const { babies, error, isLoading, refresh } = useBaby();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   useEffect(() => {
@@ -77,9 +81,15 @@ function MainRoute() {
     }
   }, [isAuthenticated, isBootstrapping, navigation]);
 
-  if (isBootstrapping || !isAuthenticated) {
+  if (isBootstrapping || !isAuthenticated || isLoading) {
     return <BootScreen />;
   }
+
+  if (error) {
+    return <View style={styles.center}><ErrorState message={error} onRetry={() => void refresh()} /></View>;
+  }
+
+  if (babies.length === 0) return <BabySetupScreen />;
 
   return <AppStackNavigator />;
 }
@@ -98,6 +108,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     flex: 1,
     justifyContent: "center"
-  }
+  },
+  center: { backgroundColor: colors.background, flex: 1, justifyContent: "center", padding: 24 }
 });
 

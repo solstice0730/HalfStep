@@ -11,8 +11,8 @@ class CareLog(Base):
     __tablename__ = "care_logs"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    baby_id: Mapped[int] = mapped_column(ForeignKey("babies.id"), index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    baby_id: Mapped[int] = mapped_column(ForeignKey("babies.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     log_type: Mapped[str] = mapped_column(String(20), index=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)

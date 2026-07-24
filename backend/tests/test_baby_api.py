@@ -1,5 +1,5 @@
 import unittest
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -11,7 +11,9 @@ from app.core.config import Settings
 from app.db.base import Base
 from app.main import app
 from app.models.baby import Baby
+from app.models.records import CareLog
 from app.models.user import User
+from app.utils.date_utils import age_in_days
 
 
 class BabyApiTest(unittest.TestCase):
@@ -85,6 +87,39 @@ class BabyApiTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+    def test_delete_baby_removes_its_care_logs(self) -> None:
+        created = self.client.post(
+            '/api/babies',
+            json={'name': 'Delete me', 'birthDate': '2026-06-01', 'gender': 'UNKNOWN'},
+        )
+        baby_id = created.json()['data']['id']
+        recorded = self.client.post(
+            '/api/records/urine',
+            json={'babyId': baby_id, 'occurredAt': '2026-07-21T12:00:00+09:00'},
+        )
+        self.assertEqual(recorded.status_code, 201, recorded.text)
+
+        deleted = self.client.delete(f'/api/babies/{baby_id}')
+
+        self.assertEqual(deleted.status_code, 200, deleted.text)
+        self.assertIsNone(self.db.get(Baby, baby_id))
+        self.assertEqual(self.db.query(CareLog).filter(CareLog.baby_id == baby_id).count(), 0)
+
+    def test_future_birth_date_is_rejected(self) -> None:
+        response = self.client.post(
+            '/api/babies',
+            json={
+                'name': 'Future',
+                'birthDate': (date.today() + timedelta(days=1)).isoformat(),
+                'gender': 'UNKNOWN',
+            },
+        )
+
+        self.assertEqual(response.status_code, 422, response.text)
+
+    def test_age_in_days_never_returns_a_negative_value(self) -> None:
+        self.assertEqual(age_in_days(date.today() + timedelta(days=1)), 0)
 
     def test_settings_ignore_compose_helper_variables(self) -> None:
         settings = Settings(mysql_host="mysql", mysql_port=3306)

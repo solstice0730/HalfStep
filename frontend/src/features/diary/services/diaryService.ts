@@ -1,22 +1,45 @@
-import type { SavedDiary } from "@/features/diary/types/diary";
+import type { CreateDiaryInput, SavedDiary, UpdateDiaryInput } from "@/features/diary/types/diary";
+import { apiRequest } from "@/services/api/apiClient";
 
-// ponytail: module-level in-memory mock, same rationale as recordsService — swap for a
-// real diary-save API by editing this file only, callers already await these as async.
-const store = new Map<string, SavedDiary>();
-
-export async function saveDiary(diary: SavedDiary): Promise<SavedDiary> {
-  store.set(diary.date, diary);
-  return diary;
+export async function saveDiary(accessToken: string, input: CreateDiaryInput): Promise<SavedDiary> {
+  const { data } = await apiRequest<SavedDiary>("/diary", {
+    method: "POST",
+    accessToken,
+    body: input
+  });
+  return data;
 }
 
-export async function getDiaryByDate(date: string): Promise<SavedDiary | null> {
-  return store.get(date) ?? null;
+export async function getDiaryByDate(
+  accessToken: string,
+  babyId: number,
+  date: string
+): Promise<SavedDiary | null> {
+  const { data } = await apiRequest<SavedDiary | null>("/diary", {
+    accessToken,
+    query: { babyId, date }
+  });
+  return data;
 }
 
-// year-month (1-12) 기준으로 저장된 일지가 있는 날짜(YYYY-MM-DD) 목록을 반환한다.
-export async function getDiaryDatesInMonth(year: number, month: number): Promise<string[]> {
-  const prefix = `${year}-${String(month).padStart(2, "0")}`;
-  return Array.from(store.keys())
-    .filter((date) => date.startsWith(prefix))
-    .sort();
+export async function getDiaryById(accessToken: string, diaryId: number): Promise<SavedDiary> {
+  const { data } = await apiRequest<SavedDiary>(`/diary/${diaryId}`, { accessToken });
+  return data;
+}
+
+export async function updateDiary(
+  accessToken: string,
+  diaryId: number,
+  input: UpdateDiaryInput
+): Promise<SavedDiary> {
+  const { data } = await apiRequest<SavedDiary>(`/diary/${diaryId}`, {
+    method: "PUT",
+    accessToken,
+    body: input
+  });
+  return data;
+}
+
+export async function deleteDiary(accessToken: string, diaryId: number): Promise<void> {
+  await apiRequest<null>(`/diary/${diaryId}`, { method: "DELETE", accessToken });
 }

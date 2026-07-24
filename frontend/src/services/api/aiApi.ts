@@ -1,4 +1,5 @@
 import { env } from "@/config/env";
+import { notifyAuthFailure } from "@/services/api/apiClient";
 import type { DiaryGenerationRequest, DiaryGenerationResponse } from "@/features/records/types/records";
 
 export type AiErrorKind = "network" | "auth" | "validation" | "server" | "timeout" | "malformed";
@@ -34,7 +35,7 @@ type ApiEnvelope<T> = {
 
 export async function fetchDailySummary(
   accessToken: string,
-  babyId: string,
+  babyId: number,
   date: string
 ): Promise<DailySummaryResult> {
   const response = await fetch(`${env.apiBaseUrl}/ai/daily-summary`, {
@@ -46,6 +47,7 @@ export async function fetchDailySummary(
     body: JSON.stringify({ babyId, date })
   });
 
+  if (response.status === 401) notifyAuthFailure();
   if (!response.ok) {
     throw new Error("하루 요약을 불러오지 못했습니다.");
   }
@@ -56,7 +58,7 @@ export async function fetchDailySummary(
 
 export async function askAiQuestion(
   accessToken: string,
-  babyId: string,
+  babyId: number,
   date: string,
   question: string
 ): Promise<AskResult> {
@@ -69,6 +71,7 @@ export async function askAiQuestion(
     body: JSON.stringify({ babyId, date, question })
   });
 
+  if (response.status === 401) notifyAuthFailure();
   if (!response.ok) {
     throw new Error("답변을 가져오지 못했습니다.");
   }
@@ -107,6 +110,7 @@ export async function generateDiary(
   }
 
   if (response.status === 401) {
+    notifyAuthFailure();
     throw new AiRequestError("auth", "인증이 만료되었습니다.");
   }
   if (response.status === 422) {

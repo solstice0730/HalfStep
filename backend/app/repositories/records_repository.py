@@ -19,6 +19,10 @@ def create_log(db: Session, **values) -> CareLog:
     return log
 
 
+def delete_logs_for_baby(db: Session, *, baby_id: int) -> None:
+    db.query(CareLog).filter(CareLog.baby_id == baby_id).delete(synchronize_session=False)
+
+
 def list_logs(
     db: Session,
     *,

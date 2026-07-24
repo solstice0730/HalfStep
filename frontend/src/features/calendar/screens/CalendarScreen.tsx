@@ -6,11 +6,10 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { getCalendarDay, getCalendarMonth, type CalendarTimelineItem } from "@/features/calendar/services/calendarApi";
-import { getDiaryByDate } from "@/features/diary/services/diaryService";
-import type { SavedDiary } from "@/features/diary/types/diary";
+import { useBaby } from "@/features/baby/hooks/useBaby";
+import { getCalendarDay, getCalendarMonth, type CalendarDiary, type CalendarTimelineItem } from "@/features/calendar/services/calendarApi";
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
-import { AiRequestError } from "@/services/api/aiApi";
+import { ApiRequestError } from "@/services/api/apiClient";
 import { colors } from "@/shared/constants/colors";
 
 type CalendarScreenProps = BottomTabScreenProps<MainTabParamList, "Calendar">;
@@ -29,6 +28,7 @@ const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 export function CalendarScreen(_props: CalendarScreenProps) {
   const { accessToken, signOut } = useAuth();
+  const { activeBaby } = useBaby();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [markedDates, setMarkedDates] = useState<Set<string>>(new Set());
@@ -36,12 +36,12 @@ export function CalendarScreen(_props: CalendarScreenProps) {
 
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [timeline, setTimeline] = useState<CalendarTimelineItem[]>([]);
-  const [dayDiary, setDayDiary] = useState<SavedDiary | null>(null);
+  const [dayDiary, setDayDiary] = useState<CalendarDiary | null>(null);
   const [dayStatus, setDayStatus] = useState<AsyncStatus>("idle");
 
   const handleAuthError = useCallback(
     async (error: unknown) => {
-      if (error instanceof AiRequestError && error.kind === "auth") {
+      if (error instanceof ApiRequestError && error.kind === "auth") {
         await signOut();
         return true;
       }
@@ -51,33 +51,33 @@ export function CalendarScreen(_props: CalendarScreenProps) {
   );
 
   const loadMonth = useCallback(async () => {
-    if (!accessToken) return;
+    if (!accessToken || !activeBaby) return;
     setMonthStatus("loading");
     try {
-      const result = await getCalendarMonth(accessToken, year, month);
+      const result = await getCalendarMonth(accessToken, activeBaby.id, year, month);
       setMarkedDates(new Set(result.days.filter((day) => day.recordCount > 0 || day.hasDiary).map((day) => day.date)));
       setMonthStatus("idle");
     } catch (error) {
       if (await handleAuthError(error)) return;
       setMonthStatus("error");
     }
-  }, [accessToken, year, month, handleAuthError]);
+  }, [accessToken, activeBaby, year, month, handleAuthError]);
 
   const loadDay = useCallback(
     async (date: string) => {
-      if (!accessToken) return;
+      if (!accessToken || !activeBaby) return;
       setDayStatus("loading");
       try {
-        const [day, diary] = await Promise.all([getCalendarDay(accessToken, date), getDiaryByDate(date)]);
+        const day = await getCalendarDay(accessToken, activeBaby.id, date);
         setTimeline(day.timeline);
-        setDayDiary(diary);
+        setDayDiary(day.diary);
         setDayStatus("idle");
       } catch (error) {
         if (await handleAuthError(error)) return;
         setDayStatus("error");
       }
     },
-    [accessToken, handleAuthError]
+    [accessToken, activeBaby, handleAuthError]
   );
 
   useFocusEffect(

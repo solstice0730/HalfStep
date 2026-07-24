@@ -176,13 +176,13 @@ function ProviderIcon({ icon, color }: { icon: ProviderOption["icon"]; color: st
 
 function getProviderHelper(provider: OAuthProvider) {
   if (provider === "google" && !env.googleClientId) {
-    return "EXPO_PUBLIC_GOOGLE_CLIENT_ID를 설정하면 활성화됩니다.";
+    return "Google 로그인 설정이 필요합니다.";
   }
   if (provider === "kakao" && !env.kakaoRestApiKey) {
-    return "EXPO_PUBLIC_KAKAO_REST_API_KEY를 설정하면 활성화됩니다.";
+    return "카카오 로그인 설정이 필요합니다.";
   }
   if (provider === "naver" && !env.naverClientId) {
-    return "EXPO_PUBLIC_NAVER_CLIENT_ID를 설정하면 활성화됩니다.";
+    return "네이버 로그인 설정이 필요합니다.";
   }
   return null;
 }
@@ -221,11 +221,14 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   panel: {
+    alignSelf: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
-    padding: 18
+    maxWidth: 720,
+    padding: 18,
+    width: "100%"
   },
   panelTitle: {
     color: colors.primaryDark,

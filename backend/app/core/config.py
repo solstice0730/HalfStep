@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     AI_MODEL: str = "gpt-4o-mini"
     AI_FALLBACK_ENABLED: bool = True
 
+    UPLOAD_DIR: str = "/app/uploads"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

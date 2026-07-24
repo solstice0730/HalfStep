@@ -1,4 +1,3 @@
-import { env } from "@/config/env";
 import { apiRequest } from "@/services/api/apiClient";
 import type {
   BreastSide,
@@ -69,64 +68,75 @@ function toStoolRecord(raw: RawCareRecord): StoolRecord {
   };
 }
 
-export async function getTodayRecords(accessToken: string, date: string): Promise<TodayRecords> {
-  const { data } = await apiRequest<RawCareRecord[]>("/records", {
-    accessToken,
-    query: { babyId: env.demoBabyId, date }
-  });
+export async function getTodayRecords(accessToken: string, babyId: number, date: string): Promise<TodayRecords> {
+  const records: RawCareRecord[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const response = await apiRequest<RawCareRecord[]>("/records", {
+      accessToken,
+      query: { babyId, date, cursor, limit: 100 }
+    });
+    records.push(...response.data);
+    cursor = response.meta?.hasNext && response.meta.cursor ? response.meta.cursor : undefined;
+  } while (cursor);
 
   return {
-    feeding: data.filter((record) => record.type === "FEEDING").map(toFeedingRecord),
-    sleep: data.filter((record) => record.type === "SLEEP").map(toSleepRecord),
-    urine: data.filter((record) => record.type === "URINE").map(toUrineRecord),
-    stool: data.filter((record) => record.type === "STOOL").map(toStoolRecord)
+    feeding: records.filter((record) => record.type === "FEEDING").map(toFeedingRecord),
+    sleep: records.filter((record) => record.type === "SLEEP").map(toSleepRecord),
+    urine: records.filter((record) => record.type === "URINE").map(toUrineRecord),
+    stool: records.filter((record) => record.type === "STOOL").map(toStoolRecord)
   };
 }
 
 export async function addFeedingRecord(
   accessToken: string,
+  babyId: number,
   record: { occurredAt: string; feedingType: FeedingType; amountMl?: number; durationMinutes?: number; breastSide?: BreastSide }
 ): Promise<FeedingRecord> {
   const { data } = await apiRequest<RawCareRecord>("/records/feeding", {
     method: "POST",
     accessToken,
-    body: { babyId: env.demoBabyId, ...record }
+    body: { babyId, ...record }
   });
   return toFeedingRecord(data);
 }
 
 export async function addSleepRecord(
   accessToken: string,
+  babyId: number,
   record: { startedAt: string; endedAt: string; sleepType?: SleepType; status?: SleepStatus }
 ): Promise<SleepRecord> {
   const { data } = await apiRequest<RawCareRecord>("/records/sleep", {
     method: "POST",
     accessToken,
-    body: { babyId: env.demoBabyId, ...record }
+    body: { babyId, ...record }
   });
   return toSleepRecord(data);
 }
 
 export async function addUrineRecord(
   accessToken: string,
+  babyId: number,
   record: { occurredAt: string; amount?: DiaperAmount; color?: UrineColor }
 ): Promise<UrineRecord> {
   const { data } = await apiRequest<RawCareRecord>("/records/urine", {
     method: "POST",
     accessToken,
-    body: { babyId: env.demoBabyId, ...record }
+    body: { babyId, ...record }
   });
   return toUrineRecord(data);
 }
 
 export async function addStoolRecord(
   accessToken: string,
-  record: { occurredAt: string; amount?: DiaperAmount; color?: StoolColor; form?: StoolForm }
+  babyId: number,
+  record: { occurredAt: string; amount?: DiaperAmount; color?: StoolColor; form?: StoolForm; photoUrl?: string }
 ): Promise<StoolRecord> {
   const { data } = await apiRequest<RawCareRecord>("/records/stool", {
     method: "POST",
     accessToken,
-    body: { babyId: env.demoBabyId, ...record }
+    body: { babyId, ...record }
   });
   return toStoolRecord(data);
 }

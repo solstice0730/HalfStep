@@ -1,4 +1,3 @@
-import { env } from "@/config/env";
 import { apiRequest } from "@/services/api/apiClient";
 
 export interface CalendarDaySummary {
@@ -25,24 +24,37 @@ export interface CalendarTimelineItem {
 
 export interface CalendarDay {
   date: string;
-  // #19가 아직 캘린더 API에 연결되지 않아 항상 null. 저장된 AI 일지는 로컬 diaryService에서 조회한다.
-  diary: unknown | null;
+  diary: CalendarDiary | null;
   timeline: CalendarTimelineItem[];
   daySummary: { feedingCount: number; sleepTotalMinutes: number; urineCount: number; stoolCount: number };
 }
 
-export async function getCalendarMonth(accessToken: string, year: number, month: number): Promise<CalendarMonth> {
+export interface CalendarDiary {
+  id: number;
+  babyId: number;
+  date: string;
+  title: string;
+  content: string;
+  isAiGenerated: boolean;
+  highlights: string[];
+  notice: string | null;
+  imageUrls: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getCalendarMonth(accessToken: string, babyId: number, year: number, month: number): Promise<CalendarMonth> {
   const { data } = await apiRequest<CalendarMonth>("/calendar", {
     accessToken,
-    query: { babyId: env.demoBabyId, year, month }
+    query: { babyId, year, month }
   });
   return data;
 }
 
-export async function getCalendarDay(accessToken: string, date: string): Promise<CalendarDay> {
+export async function getCalendarDay(accessToken: string, babyId: number, date: string): Promise<CalendarDay> {
   const { data } = await apiRequest<CalendarDay>("/calendar/daily", {
     accessToken,
-    query: { babyId: env.demoBabyId, date }
+    query: { babyId, date }
   });
   return data;
 }
