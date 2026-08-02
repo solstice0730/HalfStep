@@ -35,6 +35,10 @@ class BabyResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserUpdateRequest(BaseModel):
+    nickname: str
+
+
 class UserMeResponse(BaseModel):
     id: int
     nickname: str | None

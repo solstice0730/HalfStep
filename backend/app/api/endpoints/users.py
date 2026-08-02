@@ -3,8 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
-from app.schemas.baby import BabyResponse, UserMeResponse
+from app.schemas.baby import BabyResponse, UserMeResponse, UserUpdateRequest
 from app.services.baby_service import get_my_babies
+from app.services.user_service import update_profile
 from app.utils.date_utils import age_in_days
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -35,3 +36,17 @@ def get_me(
         createdAt=current_user.created_at,
     )
     return {"success": True, "data": data.model_dump()}
+
+
+@router.patch("/me", status_code=status.HTTP_200_OK)
+def update_me(
+    payload: UserUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    user = update_profile(db, user=current_user, nickname=payload.nickname)
+    db.commit()
+    db.refresh(user)
+    return {"success": True, "data": {"id": user.id, "nickname": user.nickname}}
+
+
