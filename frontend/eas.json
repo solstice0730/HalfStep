@@ -1,0 +1,14 @@
+{
+  "cli": {
+    "version": ">= 20.3.0"
+  },
+  "build": {
+    "appetize-sim": {
+      "environment": "preview",
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    }
+  }
+}

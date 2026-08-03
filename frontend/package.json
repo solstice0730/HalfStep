@@ -10,7 +10,7 @@
     "start:tunnel": "expo start --tunnel",
     "start:localhost": "expo start --localhost",
     "start:dev-client": "expo start --dev-client",
-    "test": "tsx --test src/features/auth/services/oauthRuntime.test.ts",
+    "test": "tsx --test src/features/auth/services/oauthRuntime.test.ts src/config/easProfile.test.ts",
     "android": "expo start --android",
     "ios": "expo run:ios",
     "ios:go": "expo start --ios",
