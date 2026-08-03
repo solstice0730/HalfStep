@@ -101,7 +101,13 @@ function DevLoginButton() {
 
 function OAuthLoginButton({ option }: { option: ProviderOption }) {
   const { signInWithProviderCode } = useAuth();
-  const { canStart, getAuthorizationCode, promptAsync, response } = useOAuthProvider(option.provider);
+  const {
+    canStart,
+    getAuthorizationCode,
+    promptAsync,
+    response,
+    unavailableReason
+  } = useOAuthProvider(option.provider);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -134,7 +140,7 @@ function OAuthLoginButton({ option }: { option: ProviderOption }) {
     await promptAsync();
   };
 
-  const helperText = getProviderHelper(option.provider);
+  const helperText = unavailableReason ?? getProviderHelper(option.provider);
 
   return (
     <View>

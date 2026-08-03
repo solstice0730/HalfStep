@@ -158,3 +158,38 @@ chore: move dockerfiles to infra
 - API 명세 정리
 - SQLAlchemy 모델 및 Alembic migration 구성
 - 인증 API 구현
+
+## iOS OAuth 개발 빌드
+
+Expo Go는 HalfStep의 `halfstep://` URL 스킴을 소유하지 않으므로 실제 OAuth
+callback을 받을 수 없습니다. Expo Go에서는 UI와 개발용 로그인을 확인하고,
+실제 카카오·Google·네이버 OAuth는 HalfStep development build에서 검증합니다.
+
+OAuth 제공자 콘솔에는 네이티브 Redirect URI로 `halfstep://login`을 정확히
+등록합니다. 프론트엔드에는 `.env.example`의 공개 client ID만 설정하고,
+client secret은 `backend/.env`에만 둡니다.
+
+macOS에서 처음 development build를 설치할 때:
+
+```bash
+cd frontend
+npm install
+npm run ios
+```
+
+설치 후 Metro를 다시 시작할 때:
+
+```bash
+cd frontend
+npm run start:dev-client
+```
+
+Expo Go로 UI 또는 개발용 로그인만 확인할 때:
+
+```bash
+cd frontend
+npm run ios:go
+```
+
+개발 빌드의 iOS bundle identifier는 `com.solstice0730.halfstep`이며, OAuth
+완료 후 앱은 고정 callback인 `halfstep://login`으로 다시 열립니다.

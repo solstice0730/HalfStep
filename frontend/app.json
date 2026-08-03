@@ -21,6 +21,7 @@
       ]
     ],
     "ios": {
+      "bundleIdentifier": "com.solstice0730.halfstep",
       "supportsTablet": true
     },
     "android": {

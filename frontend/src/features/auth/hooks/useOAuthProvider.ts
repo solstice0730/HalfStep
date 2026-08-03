@@ -1,7 +1,10 @@
 import * as AuthSession from "expo-auth-session";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { useCallback, useMemo } from "react";
+import { Platform } from "react-native";
 
 import { env } from "@/config/env";
+import { resolveOAuthRuntime } from "@/features/auth/services/oauthRuntime";
 import type { OAuthProvider } from "@/features/auth/types/auth";
 
 type OAuthProviderConfig = {
@@ -32,10 +35,20 @@ const providerConfigs: Record<OAuthProvider, OAuthProviderConfig> = {
 
 export function useOAuthProvider(provider: OAuthProvider) {
   const config = providerConfigs[provider];
-  const redirectUri = useMemo(
-    () => AuthSession.makeRedirectUri({ path: "login", scheme: "halfstep" }),
+  const webRedirectUri = useMemo(
+    () => AuthSession.makeRedirectUri({ path: "login" }),
     []
   );
+  const runtime = useMemo(
+    () =>
+      resolveOAuthRuntime({
+        isExpoGo: Constants.executionEnvironment === ExecutionEnvironment.StoreClient,
+        platform: Platform.OS,
+        webRedirectUri
+      }),
+    [webRedirectUri]
+  );
+  const redirectUri = runtime.redirectUri;
   const discovery = useMemo(
     () => ({
       authorizationEndpoint: config.authorizationEndpoint
@@ -66,9 +79,10 @@ export function useOAuthProvider(provider: OAuthProvider) {
   }, [redirectUri, request?.codeVerifier, response]);
 
   return {
-    canStart: Boolean(config.clientId && request),
+    canStart: Boolean(config.clientId && request && runtime.supported),
     getAuthorizationCode,
     promptAsync,
-    response
+    response,
+    unavailableReason: runtime.unavailableReason
   };
 }
