@@ -28,6 +28,12 @@
       "adaptiveIcon": {
         "backgroundColor": "#FFF7EC"
       }
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b3a8d196-94fc-449d-aef1-b6694d15d331"
+      }
+    },
+    "owner": "solstice0730"
   }
 }
