@@ -1,10 +1,14 @@
 import * as AuthSession from "expo-auth-session";
 import Constants, { ExecutionEnvironment } from "expo-constants";
-import { useCallback, useMemo } from "react";
+import * as WebBrowser from "expo-web-browser";
+import { useCallback, useMemo, useState } from "react";
 import { Platform } from "react-native";
 
 import { env } from "@/config/env";
-import { resolveOAuthRuntime } from "@/features/auth/services/oauthRuntime";
+import {
+  resolveOAuthRedirectUris,
+  resolveOAuthRuntime
+} from "@/features/auth/services/oauthRuntime";
 import type { OAuthProvider } from "@/features/auth/types/auth";
 
 type OAuthProviderConfig = {
@@ -48,7 +52,16 @@ export function useOAuthProvider(provider: OAuthProvider) {
       }),
     [webRedirectUri]
   );
-  const redirectUri = runtime.redirectUri;
+  const redirectUris = useMemo(
+    () =>
+      resolveOAuthRedirectUris({
+        apiBaseUrl: env.apiBaseUrl,
+        appRedirectUri: runtime.redirectUri,
+        platform: Platform.OS,
+        provider
+      }),
+    [provider, runtime.redirectUri]
+  );
   const discovery = useMemo(
     () => ({
       authorizationEndpoint: config.authorizationEndpoint
@@ -56,16 +69,39 @@ export function useOAuthProvider(provider: OAuthProvider) {
     [config.authorizationEndpoint]
   );
 
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+  const [request, authResponse, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId: config.clientId,
-      redirectUri,
+      redirectUri: redirectUris.authorizationRedirectUri,
       responseType: AuthSession.ResponseType.Code,
       scopes: config.scopes,
       usePKCE: config.usePKCE
     },
     discovery
   );
+  const [relayResponse, setRelayResponse] = useState<typeof authResponse>(null);
+  const response = redirectUris.usesRelay ? relayResponse : authResponse;
+
+  const promptOAuthAsync = useCallback(async () => {
+    if (!redirectUris.usesRelay) {
+      return promptAsync();
+    }
+    if (!request) {
+      return null;
+    }
+
+    const authorizationUrl = await request.makeAuthUrlAsync(discovery);
+    const browserResult = await WebBrowser.openAuthSessionAsync(
+      authorizationUrl,
+      redirectUris.returnUri
+    );
+    const nextResponse =
+      browserResult.type === "success"
+        ? request.parseReturnUrl(browserResult.url)
+        : ({ type: browserResult.type } as AuthSession.AuthSessionResult);
+    setRelayResponse(nextResponse);
+    return nextResponse;
+  }, [discovery, promptAsync, redirectUris, request]);
 
   const getAuthorizationCode = useCallback(() => {
     if (response?.type !== "success" || !response.params.code) {
@@ -74,14 +110,14 @@ export function useOAuthProvider(provider: OAuthProvider) {
     return {
       code: response.params.code,
       codeVerifier: request?.codeVerifier,
-      redirectUri
+      redirectUri: redirectUris.authorizationRedirectUri
     };
-  }, [redirectUri, request?.codeVerifier, response]);
+  }, [redirectUris.authorizationRedirectUri, request?.codeVerifier, response]);
 
   return {
     canStart: Boolean(config.clientId && request && runtime.supported),
     getAuthorizationCode,
-    promptAsync,
+    promptAsync: promptOAuthAsync,
     response,
     unavailableReason: runtime.unavailableReason
   };
