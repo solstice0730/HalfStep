@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 
 from urllib.parse import urlencode
 
@@ -22,13 +23,19 @@ from app.services.oauth import exchange_oauth_code_for_profile, verify_oauth_acc
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.get("/kakao/callback", status_code=status.HTTP_302_FOUND)
-def kakao_oauth_callback(
+@router.get("/{provider}/callback", status_code=status.HTTP_302_FOUND)
+def oauth_callback(
+    provider: Literal["google", "kakao", "naver"],
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
     error_description: str | None = None,
 ) -> RedirectResponse:
+    if code is None and error is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OAuth callback is missing a result.",
+        )
     params = {
         key: value
         for key, value in {
