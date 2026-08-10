@@ -52,7 +52,7 @@ export function resolveOAuthRuntime(input: OAuthRuntimeInput): OAuthRuntime {
 }
 
 export function resolveOAuthRedirectUris(input: OAuthRedirectUrisInput): OAuthRedirectUris {
-  if (input.provider !== "kakao" || input.platform === "web") {
+  if (input.platform === "web") {
     return {
       authorizationRedirectUri: input.appRedirectUri,
       returnUri: input.appRedirectUri,
@@ -61,7 +61,8 @@ export function resolveOAuthRedirectUris(input: OAuthRedirectUrisInput): OAuthRe
   }
 
   return {
-    authorizationRedirectUri: `${input.apiBaseUrl.replace(/\/$/, "")}/auth/kakao/callback`,
+    authorizationRedirectUri:
+      `${input.apiBaseUrl.replace(/\/$/, "")}/auth/${input.provider}/callback`,
     returnUri: input.appRedirectUri,
     usesRelay: true
   };
