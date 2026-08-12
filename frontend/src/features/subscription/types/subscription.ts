@@ -1,8 +1,5 @@
-export type TierMark = "full" | "partial" | "none";
-
 export interface PlanComparisonRow {
   feature: string;
-  freeMark: TierMark;
-  freeNote: string | null;
-  premiumNote: string;
+  /** true if the feature's usage limit / billing policy isn't finalized yet — renders a footnote marker instead of an "unlimited" claim. */
+  quotaPending?: boolean;
 }

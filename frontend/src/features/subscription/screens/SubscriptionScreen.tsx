@@ -1,47 +1,24 @@
-import { ArrowLeft, Check, Crown, Minus, Sparkles } from "lucide-react-native";
+import { ArrowLeft, Check, Crown, Sparkles } from "lucide-react-native";
 import { ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
 
-import type { PlanComparisonRow, TierMark } from "@/features/subscription/types/subscription";
+import type { PlanComparisonRow } from "@/features/subscription/types/subscription";
 import { colors } from "@/shared/constants/colors";
 
 interface SubscriptionScreenProps {
   onClose: () => void;
 }
 
-// 가격/비교표는 전부 BM 가설이며 실제 결제와 연결되어 있지 않다 (MVP 제외 범위: 결제, 영수증 검증, 인앱결제).
+// 2026-08-02 확정 BM: 7일 체험 후 월 8,900원 전면 유료, 무료 티어 없음.
+// 결제 연동은 MVP 제외 범위(#16)이며, 가격 표시는 이슈 요구사항에 따라 "가설·검토 중"으로 노출한다.
 const HYPOTHETICAL_PRICE = "월 8,900원";
 
+// 현재 구현된 기능만 표시한다. 가족방, 사진 픽셀 기반 자동 분석, 성장 패턴 리포트는 미구현이라 제외.
 const comparisonRows: PlanComparisonRow[] = [
-  {
-    feature: "기록 (수유·수면·배변·이유식·체온·키/몸무게, 캘린더, 가족방, 기록 조회)",
-    freeMark: "full",
-    freeNote: "전부 무료",
-    premiumNote: "동일 (기록은 절대 유료화하지 않음)"
-  },
-  {
-    feature: "AI 하루 요약",
-    freeMark: "partial",
-    freeNote: "월 5회 (맛보기)",
-    premiumNote: "무제한"
-  },
-  {
-    feature: "AI 육아일기 / 사진→일기 자동생성",
-    freeMark: "none",
-    freeNote: null,
-    premiumNote: "무제한 제공"
-  },
-  {
-    feature: "성장 패턴 분석 / 주간·월간 리포트",
-    freeMark: "none",
-    freeNote: null,
-    premiumNote: "제공"
-  },
-  {
-    feature: "AI 질문",
-    freeMark: "none",
-    freeNote: null,
-    premiumNote: "무제한"
-  }
+  { feature: "기록 (수유·수면·배변·이유식·체온·키/몸무게, 캘린더 조회)" },
+  { feature: "육아 커뮤니티 (정보 공유, 질문·답변 게시판)" },
+  { feature: "AI 하루 요약", quotaPending: true },
+  { feature: "AI 육아일기 초안 (사진 설명 + 기록 기반)", quotaPending: true },
+  { feature: "AI 질문", quotaPending: true }
 ];
 
 export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
@@ -60,8 +37,8 @@ export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
           <View style={styles.heroIcon}>
             <Crown color={colors.primary} size={28} />
           </View>
-          <Text style={styles.heroTitle}>HalfStep 프리미엄</Text>
-          <Text style={styles.heroSubtitle}>AI 육아일기와 성장 분석을 제한 없이 이용하세요</Text>
+          <Text style={styles.heroTitle}>HalfStep 구독</Text>
+          <Text style={styles.heroSubtitle}>7일 체험 후 월 8,900원 구독으로 계속 이용해요</Text>
         </View>
 
         <View style={styles.priceCard}>
@@ -71,62 +48,61 @@ export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
               <Text style={styles.priceBadgeText}>가격 가설 · 검토 중</Text>
             </View>
           </View>
-          <Text style={styles.priceHint}>정식 출시 전 BM 검증용 화면이에요. 실제로 청구되지 않습니다.</Text>
+          <Text style={styles.priceHint}>
+            체험 7일이 끝나면 구독 결제 없이는 계속 이용할 수 없어요. 별도로 무료로 쓸 수 있는 단계는 없습니다.
+            이 화면은 BM 검증용이라 실제로 청구되지 않아요.
+          </Text>
         </View>
 
-        <Text style={styles.sectionLabel}>플랜 비교</Text>
+        <Text style={styles.sectionLabel}>7일 체험 · 구독 후 비교</Text>
         <View style={styles.tableCard}>
           <View style={styles.tableHeaderRow}>
             <Text style={[styles.tableHeaderCell, styles.featureColumn]}>기능</Text>
-            <Text style={[styles.tableHeaderCell, styles.tierHeaderCell]}>Free</Text>
-            <Text style={[styles.tableHeaderCell, styles.tierHeaderCell, styles.premiumHeaderText]}>Premium</Text>
+            <Text style={[styles.tableHeaderCell, styles.tierHeaderCell]}>7일 체험</Text>
+            <Text style={[styles.tableHeaderCell, styles.tierHeaderCell, styles.premiumHeaderText]}>구독 후</Text>
           </View>
 
           {comparisonRows.map((row, index) => (
             <View key={row.feature} style={[styles.tableRow, index === comparisonRows.length - 1 && styles.tableRowLast]}>
               <View style={styles.featureColumn}>
-                <Text style={styles.featureText}>{row.feature}</Text>
+                <Text style={styles.featureText}>
+                  {row.feature}
+                  {row.quotaPending ? <Text style={styles.quotaMarker}> *</Text> : null}
+                </Text>
               </View>
               <View style={styles.tierColumn}>
-                <TierMarkIcon mark={row.freeMark} />
-                {row.freeNote ? <Text style={styles.tierNote}>{row.freeNote}</Text> : null}
+                <Check color={colors.textMuted} size={18} />
               </View>
               <View style={styles.tierColumn}>
-                <TierMarkIcon mark="full" premium />
-                <Text style={[styles.tierNote, styles.premiumNote]}>{row.premiumNote}</Text>
+                <Check color={colors.primary} size={18} />
               </View>
             </View>
           ))}
         </View>
+        <Text style={styles.quotaFootnote}>* AI 기능의 월 사용량·과금 정책은 아직 확정되지 않았어요.</Text>
 
         <View style={styles.valueCard}>
           <View style={styles.valueHeader}>
             <Sparkles color={colors.primary} size={16} />
-            <Text style={styles.valueTitle}>프리미엄으로 얻는 것</Text>
+            <Text style={styles.valueTitle}>구독으로 계속 이용하는 것</Text>
           </View>
           <Text style={styles.valueText}>
-            사진만 올리면 AI가 하루 육아일기를 자동으로 써주고, 우리 아이의 성장 패턴을 주간·월간 리포트로 확인할 수 있어요.
-            궁금한 걸 AI에게 무제한으로 물어볼 수 있고요. 기록·캘린더·가족방 같은 핵심 기능은 앞으로도 계속 무료입니다.
+            사진 설명과 기록을 바탕으로 AI가 하루 요약과 육아일기 초안을 만들어 드려요. 육아가 궁금할 땐 AI에게 물어볼 수
+            있고, 다른 부모들과 커뮤니티에서 정보를 나눌 수 있어요. 이 기능들은 7일 체험 후에는 구독을 통해서만 계속
+            이용할 수 있어요.
           </Text>
         </View>
 
         <Pressable disabled style={styles.upgradeButton}>
-          <Text style={styles.upgradeButtonText}>프리미엄으로 업그레이드</Text>
+          <Text style={styles.upgradeButtonText}>구독 시작하기</Text>
           <View style={styles.upgradeBadge}>
             <Text style={styles.upgradeBadgeText}>준비 중</Text>
           </View>
         </Pressable>
-        <Text style={styles.disclaimer}>실제 결제는 아직 지원하지 않아요. 가격과 혜택은 검토 중이며 바뀔 수 있습니다.</Text>
+        <Text style={styles.disclaimer}>실제 결제는 아직 지원하지 않아요. 가격은 검토 중이며 바뀔 수 있습니다.</Text>
       </ScrollView>
     </View>
   );
-}
-
-function TierMarkIcon({ mark, premium = false }: { mark: TierMark; premium?: boolean }) {
-  const color = premium ? colors.primary : colors.textMuted;
-  if (mark === "full") return <Check color={color} size={18} />;
-  if (mark === "partial") return <Check color={colors.warning} size={18} />;
-  return <Minus color={colors.border} size={18} />;
 }
 
 const styles = StyleSheet.create({
@@ -268,19 +244,20 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 17
   },
+  quotaMarker: {
+    color: colors.textMuted,
+    fontWeight: "700"
+  },
   tierColumn: {
     alignItems: "center",
     flex: 1,
     gap: 3
   },
-  tierNote: {
+  quotaFootnote: {
     color: colors.textMuted,
-    fontSize: 10,
-    textAlign: "center"
-  },
-  premiumNote: {
-    color: colors.primary,
-    fontWeight: "700"
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: -6
   },
   valueCard: {
     backgroundColor: colors.blueSoft,
