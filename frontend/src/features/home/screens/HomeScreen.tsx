@@ -36,7 +36,7 @@ import {
   type PanGestureHandlerGestureEvent,
   type PanGestureHandlerStateChangeEvent
 } from "react-native-gesture-handler";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -542,9 +542,11 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
       </Modal>
 
       <Modal animationType="none" onRequestClose={closeMyPage} transparent visible={myPageOpen}>
-        <Animated.View style={[styles.myPageRoot, { transform: [{ translateY: myPageTranslateY }] }]}>
-          <MyPageScreen onClose={closeMyPage} />
-        </Animated.View>
+        <SafeAreaProvider>
+          <Animated.View style={[styles.myPageRoot, { transform: [{ translateY: myPageTranslateY }] }]}>
+            <MyPageScreen onClose={closeMyPage} />
+          </Animated.View>
+        </SafeAreaProvider>
       </Modal>
 
       {currentPage === 1 && (

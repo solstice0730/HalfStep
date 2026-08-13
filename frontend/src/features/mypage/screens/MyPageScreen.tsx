@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   ArrowLeft,
   Baby,
@@ -104,7 +105,7 @@ export function MyPageScreen({ onClose }: MyPageScreenProps) {
   };
 
   return (
-    <View style={styles.root}>
+    <SafeAreaView edges={["top", "bottom"]} style={styles.root}>
       <View style={styles.header}>
         <Pressable accessibilityLabel="닫기" accessibilityRole="button" hitSlop={12} onPress={onClose} style={styles.headerButton}>
           <ArrowLeft color={colors.primaryDark} size={22} />
@@ -164,7 +165,7 @@ export function MyPageScreen({ onClose }: MyPageScreenProps) {
           </View>
           <View style={styles.rowText}>
             <Text style={styles.rowTitle}>구독 상태</Text>
-            <Text style={styles.rowSubtitle}>무료 플랜 이용 중</Text>
+            <Text style={styles.rowSubtitle}>구독 기능 준비 중</Text>
           </View>
           <ChevronRight color={colors.textMuted} size={18} />
         </Pressable>
@@ -217,7 +218,7 @@ export function MyPageScreen({ onClose }: MyPageScreenProps) {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -231,8 +232,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 12,
-    paddingTop: 54,
-    paddingBottom: 8
+    paddingBottom: 8,
+    paddingTop: 8
   },
   headerButton: {
     alignItems: "center",
