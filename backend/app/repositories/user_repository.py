@@ -53,6 +53,18 @@ def create_social_user(
     return user
 
 
+def update_user_nickname(
+    db: Session,
+    *,
+    user: User,
+    nickname: str,
+) -> User:
+    user.nickname = nickname
+    db.add(user)
+    db.flush()
+    return user
+
+
 def update_refresh_token(
     db: Session,
     *,
