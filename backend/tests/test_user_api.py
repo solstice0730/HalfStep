@@ -64,6 +64,22 @@ class UserApiTest(unittest.TestCase):
         response = self.client.patch("/api/users/me", json={})
         self.assertEqual(response.status_code, 422)
 
+    def test_patch_me_trims_nickname(self) -> None:
+        response = self.client.patch(
+            "/api/users/me",
+            json={"nickname": "  새닉네임  "},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["nickname"], "새닉네임")
+
+    def test_patch_me_rejects_blank_nickname(self) -> None:
+        response = self.client.patch("/api/users/me", json={"nickname": "   "})
+        self.assertEqual(response.status_code, 422)
+
+    def test_patch_me_rejects_nickname_over_100_characters(self) -> None:
+        response = self.client.patch("/api/users/me", json={"nickname": "a" * 101})
+        self.assertEqual(response.status_code, 422)
+
     def test_patch_me_unauthenticated(self) -> None:
         app.dependency_overrides.clear()
         app.dependency_overrides[get_db] = lambda: self.db

@@ -38,6 +38,16 @@ class BabyResponse(BaseModel):
 class UserUpdateRequest(BaseModel):
     nickname: str
 
+    @field_validator("nickname")
+    @classmethod
+    def nickname_must_be_valid(cls, value: str) -> str:
+        nickname = value.strip()
+        if not nickname:
+            raise ValueError("nickname must not be empty")
+        if len(nickname) > 100:
+            raise ValueError("nickname must be 100 characters or fewer")
+        return nickname
+
 
 class UserMeResponse(BaseModel):
     id: int

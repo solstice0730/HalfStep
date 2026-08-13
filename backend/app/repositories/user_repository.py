@@ -65,21 +65,6 @@ def update_user_nickname(
     return user
 
 
-def anonymize_user(
-    db: Session,
-    *,
-    user: User,
-) -> User:
-    user.nickname = None
-    user.email = None
-    user.profile_image_url = None
-    user.refresh_token_hash = None
-    user.refresh_token_expires_at = None
-    db.add(user)
-    db.flush()
-    return user
-
-
 def update_refresh_token(
     db: Session,
     *,
