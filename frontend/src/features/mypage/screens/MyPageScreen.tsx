@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   ArrowLeft,
   Baby,
@@ -221,7 +221,9 @@ export function MyPageScreen({ onClose }: MyPageScreenProps) {
         </View>
       </Modal>
       <Modal animationType="slide" onRequestClose={() => setSubscriptionOpen(false)} visible={subscriptionOpen}>
-        <SubscriptionScreen onClose={() => setSubscriptionOpen(false)} />
+        <SafeAreaProvider>
+          <SubscriptionScreen onClose={() => setSubscriptionOpen(false)} />
+        </SafeAreaProvider>
       </Modal>
     </SafeAreaView>
   );

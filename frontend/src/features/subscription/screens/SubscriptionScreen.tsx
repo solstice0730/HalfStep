@@ -1,5 +1,6 @@
 import { ArrowLeft, Check, Crown, Sparkles } from "lucide-react-native";
 import { ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { PlanComparisonRow } from "@/features/subscription/types/subscription";
 import { colors } from "@/shared/constants/colors";
@@ -23,7 +24,7 @@ const comparisonRows: PlanComparisonRow[] = [
 
 export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
   return (
-    <View style={styles.root}>
+    <SafeAreaView edges={["top", "bottom"]} style={styles.root}>
       <View style={styles.header}>
         <Pressable accessibilityLabel="닫기" accessibilityRole="button" hitSlop={12} onPress={onClose} style={styles.headerButton}>
           <ArrowLeft color={colors.primaryDark} size={22} />
@@ -101,7 +102,7 @@ export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
         </Pressable>
         <Text style={styles.disclaimer}>실제 결제는 아직 지원하지 않아요. 가격은 검토 중이며 바뀔 수 있습니다.</Text>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -115,8 +116,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 12,
-    paddingTop: 54,
-    paddingBottom: 8
+    paddingBottom: 8,
+    paddingTop: 8
   },
   headerButton: {
     alignItems: "center",
