@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   ArrowLeft,
   Baby,
@@ -16,6 +16,7 @@ import {
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getMyProfile, updateBabyName } from "@/features/mypage/services/mypageService";
 import type { MyPageBaby, MyPageProfile } from "@/features/mypage/types/mypage";
+import { SubscriptionScreen } from "@/features/subscription/screens/SubscriptionScreen";
 import { colors } from "@/shared/constants/colors";
 
 interface MyPageScreenProps {
@@ -43,6 +44,7 @@ export function MyPageScreen({ onClose }: MyPageScreenProps) {
   const [editingBaby, setEditingBaby] = useState<MyPageBaby | null>(null);
   const [draftName, setDraftName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [subscriptionOpen, setSubscriptionOpen] = useState(false);
 
   const load = async () => {
     if (!accessToken) return;
@@ -159,7 +161,7 @@ export function MyPageScreen({ onClose }: MyPageScreenProps) {
           <Text style={styles.rowTitle}>알림 설정</Text>
           <ChevronRight color={colors.textMuted} size={18} />
         </Pressable>
-        <Pressable onPress={() => showComingSoon("구독 관리")} style={styles.row}>
+        <Pressable onPress={() => setSubscriptionOpen(true)} style={styles.row}>
           <View style={styles.rowIcon}>
             <CreditCard color={colors.primary} size={18} />
           </View>
@@ -217,6 +219,11 @@ export function MyPageScreen({ onClose }: MyPageScreenProps) {
             </View>
           </View>
         </View>
+      </Modal>
+      <Modal animationType="slide" onRequestClose={() => setSubscriptionOpen(false)} visible={subscriptionOpen}>
+        <SafeAreaProvider>
+          <SubscriptionScreen onClose={() => setSubscriptionOpen(false)} />
+        </SafeAreaProvider>
       </Modal>
     </SafeAreaView>
   );
