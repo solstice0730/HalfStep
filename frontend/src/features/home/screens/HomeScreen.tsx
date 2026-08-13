@@ -7,9 +7,9 @@ import {
   Camera,
   ChevronDown,
   Flashlight,
-  LogOut,
   Send,
   Sparkles,
+  User,
   X,
   Zap
 } from "lucide-react-native";
@@ -36,7 +36,7 @@ import {
   type PanGestureHandlerGestureEvent,
   type PanGestureHandlerStateChangeEvent
 } from "react-native-gesture-handler";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -44,6 +44,7 @@ import { BabyProfileSheet } from "@/features/baby/components/BabyProfileSheet";
 import { useBaby } from "@/features/baby/hooks/useBaby";
 import { QuickLogMenu } from "@/features/home/components/QuickLogMenu";
 import { TodaySummary } from "@/features/home/components/TodaySummary";
+import { MyPageScreen } from "@/features/mypage/screens/MyPageScreen";
 import { calculateBabyAge, type BabyProfile } from "@/features/home/services/babyProfileService";
 import { getDiaryByDate } from "@/features/diary/services/diaryService";
 import { getTodayRecords } from "@/features/records/services/recordsService";
@@ -117,15 +118,17 @@ function BabyMascot() {
 type AsyncStatus = "idle" | "loading" | "success" | "error";
 
 export function HomeScreen({ navigation }: HomeScreenProps) {
-  const { accessToken, signOut } = useAuth();
+  const { accessToken } = useAuth();
   const { activeBaby, error: babyError, isLoading: isBabyLoading, refresh: refreshBabies } = useBaby();
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const pagerRef = useRef<ScrollView>(null);
   const cameraRef = useRef<CameraView>(null);
   const cameraTranslateX = useRef(new Animated.Value(-screenWidth)).current;
+  const myPageTranslateY = useRef(new Animated.Value(-screenHeight)).current;
   const [permission, requestPermission] = useCameraPermissions();
   const [quickOpen, setQuickOpen] = useState(false);
+  const [myPageOpen, setMyPageOpen] = useState(false);
   const [quickSheet, setQuickSheet] = useState<QuickSheetType>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [babyMenuOpen, setBabyMenuOpen] = useState(false);
@@ -236,6 +239,28 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     });
   };
 
+  const openMyPage = () => {
+    setMyPageOpen(true);
+    myPageTranslateY.setValue(-screenHeight);
+    requestAnimationFrame(() => {
+      Animated.timing(myPageTranslateY, {
+        duration: 260,
+        toValue: 0,
+        useNativeDriver: true
+      }).start();
+    });
+  };
+
+  const closeMyPage = () => {
+    Animated.timing(myPageTranslateY, {
+      duration: 220,
+      toValue: -screenHeight,
+      useNativeDriver: true
+    }).start(() => {
+      setMyPageOpen(false);
+    });
+  };
+
   const handleMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const nextPage = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
     setCurrentPage(nextPage);
@@ -290,7 +315,8 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   const homeSwipeResponder = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) => gesture.dx > 12 && Math.abs(gesture.dy) < 28,
+        onMoveShouldSetPanResponder: (evt, gesture) =>
+          gesture.dx > 12 && Math.abs(gesture.dy) < 28 && evt.nativeEvent.pageX < screenWidth - 48,
         onPanResponderGrant: () => {
           cameraTranslateX.setValue(-screenWidth);
           setCameraOpen(true);
@@ -361,8 +387,8 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
             <ChevronDown color={colors.textMuted} size={18} />
           </Pressable>
           <View style={styles.headerActions}>
-            <Pressable accessibilityRole="button" accessibilityLabel="로그아웃" style={styles.logoutButton} onPress={signOut}>
-              <LogOut color={colors.primaryDark} size={19} />
+            <Pressable accessibilityLabel="마이페이지 열기" accessibilityRole="button" onPress={openMyPage} style={styles.myPageButton}>
+              <User color={colors.primaryDark} size={19} />
             </Pressable>
             <QuickLogMenu
               open={quickOpen}
@@ -515,6 +541,14 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         </PanGestureHandler>
       </Modal>
 
+      <Modal animationType="none" onRequestClose={closeMyPage} transparent visible={myPageOpen}>
+        <SafeAreaProvider>
+          <Animated.View style={[styles.myPageRoot, { transform: [{ translateY: myPageTranslateY }] }]}>
+            <MyPageScreen onClose={closeMyPage} />
+          </Animated.View>
+        </SafeAreaProvider>
+      </Modal>
+
       {currentPage === 1 && (
         <Pressable style={styles.chatFloat} onPress={() => setChatOpen(true)}>
           <Image source={require("../../../../assets/images/chatbot-home.png")} resizeMode="contain" style={styles.chatFloatImage} />
@@ -663,21 +697,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 4
   },
-  statusText: {
-    color: colors.primaryDark,
-    fontSize: 24,
-    fontWeight: "900"
-  },
   activeBabyName: {
     color: colors.primaryDark,
     fontSize: 14,
     fontWeight: "900"
   },
-  headerActions: {
-    flexDirection: "row",
-    gap: 8
-  },
-  logoutButton: {
+  myPageButton: {
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -686,6 +711,10 @@ const styles = StyleSheet.create({
     height: 46,
     justifyContent: "center",
     width: 46
+  },
+  headerActions: {
+    flexDirection: "row",
+    gap: 8
   },
   mascotPanel: {
     flex: 1.15,
@@ -819,6 +848,9 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     paddingHorizontal: 12,
     paddingTop: 10
+  },
+  myPageRoot: {
+    flex: 1
   },
   cameraTopOverlay: {
     alignItems: "center",
