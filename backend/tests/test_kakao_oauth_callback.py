@@ -19,6 +19,7 @@ def test_oauth_callback_returns_authorization_result_to_the_app(provider):
     assert response.headers["location"] == (
         "halfstep://login?code=auth-code&state=csrf-state"
     )
+    assert response.headers["cache-control"] == "no-store"
 
 
 @pytest.mark.parametrize("provider", ["google", "kakao", "naver"])

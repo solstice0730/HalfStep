@@ -49,6 +49,7 @@ def oauth_callback(
     return RedirectResponse(
         url=f"halfstep://login?{urlencode(params)}",
         status_code=status.HTTP_302_FOUND,
+        headers={"Cache-Control": "no-store"},
     )
 
 
