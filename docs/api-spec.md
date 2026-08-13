@@ -132,6 +132,45 @@ POST /auth/social
 }
 ```
 
+#### 2.1.1 네이티브 OAuth callback
+
+```http
+GET /auth/{provider}/callback
+```
+
+네이티브 development build에서 사용하는 공개 HTTPS callback. `provider`는
+`google`, `kakao`, `naver` 중 하나이며 제공자 콘솔에는 이 HTTPS 주소를
+Redirect URI로 등록한다. 백엔드는 `code`, `state`, `error`,
+`error_description`만 앱의 `halfstep://login` return URI로 전달한다.
+
+```text
+302 Location: halfstep://login?code={authorization_code}&state={state}
+Cache-Control: no-store
+```
+
+Web은 앱 origin의 `/login` callback을 직접 사용하므로 이 relay를 거치지 않는다.
+
+#### 2.1.2 소셜 인가 코드 교환
+
+```http
+POST /auth/social/code
+```
+
+**Request Body**
+
+```json
+{
+  "provider": "kakao",
+  "code": "authorization-code",
+  "redirectUri": "https://api.example.com/api/auth/kakao/callback",
+  "codeVerifier": "pkce-code-verifier"
+}
+```
+
+`codeVerifier`는 제공자와 실행 환경에 따라 생략할 수 있다. 성공 응답은
+`POST /auth/social`과 같은 HalfStep access token, refresh token, 사용자 정보를
+반환한다.
+
 ---
 
 ### 2.2 이메일 로그인

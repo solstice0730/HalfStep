@@ -158,3 +158,51 @@ chore: move dockerfiles to infra
 - API 명세 정리
 - SQLAlchemy 모델 및 Alembic migration 구성
 - 인증 API 구현
+
+## iOS OAuth 개발 빌드
+
+Expo Go는 HalfStep의 `halfstep://` URL 스킴을 소유하지 않으므로 실제 OAuth
+callback을 받을 수 없습니다. Expo Go에서는 UI와 개발용 로그인을 확인하고,
+실제 카카오·Google·네이버 OAuth는 HalfStep development build에서 검증합니다.
+
+네이티브 OAuth에서 제공자 콘솔에 등록할 Redirect URI는 앱 스킴이 아니라
+외부에서 접근 가능한 백엔드 HTTPS callback입니다. 각 제공자에 아래 주소를
+정확히 등록합니다.
+
+```text
+{EXPO_PUBLIC_API_BASE_URL}/auth/google/callback
+{EXPO_PUBLIC_API_BASE_URL}/auth/kakao/callback
+{EXPO_PUBLIC_API_BASE_URL}/auth/naver/callback
+```
+
+백엔드는 인가 결과만 `halfstep://login`으로 전달하고 development build가 앱을
+다시 엽니다. Web은 실행 중인 앱의 `/login` callback을 별도로 등록합니다.
+프론트엔드에는 `.env.example`의 공개 client ID만 설정하고, client secret은
+`backend/.env`에만 둡니다. Appetize와 제공자 서버가 접근할 수 없는
+`localhost` 또는 만료되는 임시 터널은 지속적인 QA와 배포에 사용할 수 없습니다.
+
+macOS에서 처음 development build를 설치할 때:
+
+```bash
+cd frontend
+npm ci
+npm run ios
+```
+
+설치 후 Metro를 다시 시작할 때:
+
+```bash
+cd frontend
+npm run start:dev-client
+```
+
+Expo Go로 UI 또는 개발용 로그인만 확인할 때:
+
+```bash
+cd frontend
+npm run ios:go
+```
+
+개발 빌드의 iOS bundle identifier는 `com.solstice0730.halfstep`이며, OAuth
+완료 후 백엔드 callback이 앱의 고정 return URI인 `halfstep://login`으로
+전달합니다.

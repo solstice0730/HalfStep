@@ -73,3 +73,5 @@ KakaoTalk_*
 *.pem
 *.key
 *.crt
+docs/superpowers/specs/
+docs/superpowers/plans/
