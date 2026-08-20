@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 import type { BabyAge, BabyProfile } from "@/features/home/services/babyProfileService";
 import type { TodayRecords } from "@/features/records/types/records";
 import { colors } from "@/shared/constants/colors";
+import { withWaGwa } from "@/shared/utils/koreanParticle";
 
 type ProfileStatus = "idle" | "loading" | "success" | "error";
 
@@ -51,7 +52,7 @@ export function TodaySummary({
 
       {profileStatus === "success" && babyProfile && (
         <>
-          <Text style={styles.babyName}>{babyProfile.name}와 만난 지</Text>
+          <Text style={styles.babyName}>{withWaGwa(babyProfile.name)} 만난 지</Text>
           <Text style={styles.dayText}>{babyAge ? `${babyAge.ageDays}일째` : "생년월일 확인 필요"}</Text>
         </>
       )}

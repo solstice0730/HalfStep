@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ImageIcon, PenLine } from "lucide-react-native";
 import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getPosts } from "@/features/community/services/communityService";
@@ -87,14 +88,16 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
 
   return (
     <View style={styles.root}>
-      <View style={styles.topNav}>
-        <Text style={styles.navTitle}>커뮤니티</Text>
-        <Pressable onPress={() => navigation.navigate("CommunityWrite")} style={styles.writeButton}>
-          <PenLine color="#FFFFFF" size={14} />
-          <Text style={styles.writeButtonText}>글쓰기</Text>
-        </Pressable>
-      </View>
-      <Screen>
+      <SafeAreaView edges={["top"]} style={styles.topSafeArea}>
+        <View style={styles.topNav}>
+          <Text style={styles.navTitle}>커뮤니티</Text>
+          <Pressable onPress={() => navigation.navigate("CommunityWrite")} style={styles.writeButton}>
+            <PenLine color="#FFFFFF" size={14} />
+            <Text style={styles.writeButtonText}>글쓰기</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+      <Screen edges={["left", "right", "bottom"]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
           <Pressable style={[styles.chip, category === null && styles.chipActive]} onPress={() => setCategory(null)}>
             <Text style={[styles.chipText, category === null && styles.chipTextActive]}>전체</Text>
@@ -174,6 +177,9 @@ const styles = StyleSheet.create({
   root: {
     backgroundColor: colors.background,
     flex: 1
+  },
+  topSafeArea: {
+    backgroundColor: colors.background
   },
   topNav: {
     alignItems: "center",
