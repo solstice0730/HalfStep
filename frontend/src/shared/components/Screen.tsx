@@ -1,13 +1,17 @@
 import { PropsWithChildren } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 
 import { colors } from "@/shared/constants/colors";
 import { spacing } from "@/shared/constants/spacing";
 
-export function Screen({ children }: PropsWithChildren) {
+interface ScreenProps {
+  edges?: Edge[];
+}
+
+export function Screen({ children, edges }: PropsWithChildren<ScreenProps>) {
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={edges} style={styles.safeArea}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.inner}>{children}</View>
       </ScrollView>
