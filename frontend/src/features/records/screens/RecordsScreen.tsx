@@ -1,6 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
 import type { CompositeScreenProps } from "@react-navigation/native";
-import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import { useBottomTabBarHeight, type BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Sparkles, X } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -70,6 +70,7 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
   const { accessToken, signOut } = useAuth();
   const { activeBaby } = useBaby();
   const processedCameraUri = useRef<string | undefined>(undefined);
+  const tabBarHeight = useBottomTabBarHeight();
 
   const selectedDate = route.params?.selectedDate ?? todayIsoDate();
   const [recordsStatus, setRecordsStatus] = useState<AsyncStatus>("loading");
@@ -255,7 +256,7 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
                 <Text style={styles.navTitle}>{selectedDate === todayIsoDate() ? "오늘의 기록" : "선택한 날짜의 기록"}</Text>
               </View>
 
-              <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.editorBody}>
+              <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.editorBody, { paddingBottom: 32 + tabBarHeight }]}>
                 <View style={styles.categoryRow}>
                   <Pressable style={styles.categoryButton} onPress={() => setActiveRecordModal("feeding")}>
                     <Text style={styles.categoryButtonText}>+ 수유</Text>

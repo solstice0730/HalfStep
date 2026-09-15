@@ -1,5 +1,5 @@
 import { useFocusEffect } from "@react-navigation/native";
-import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import { useBottomTabBarHeight, type BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react-native";
 import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -118,13 +118,14 @@ export function CalendarScreen(_props: CalendarScreenProps) {
   }, [year, month]);
 
   const hasDayContent = timeline.length > 0 || dayDiary !== null;
+  const tabBarHeight = useBottomTabBarHeight();
 
   return (
     <SafeAreaView edges={["top"]} style={styles.root}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>캘린더</Text>
       </View>
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: 32 + tabBarHeight }]}>
         <View style={styles.monthCard}>
           <View style={styles.monthHeader}>
             <Pressable accessibilityLabel="이전 달" hitSlop={10} onPress={() => goToMonth(-1)}>

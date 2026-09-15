@@ -1,6 +1,6 @@
 import type { CompositeScreenProps } from "@react-navigation/native";
 import { useFocusEffect } from "@react-navigation/native";
-import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import { useBottomTabBarHeight, type BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ImageIcon, PenLine } from "lucide-react-native";
 import { useCallback, useRef, useState } from "react";
@@ -45,6 +45,7 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const requestId = useRef(0);
+  const tabBarHeight = useBottomTabBarHeight();
 
   const loadFirstPage = useCallback(async () => {
     if (!accessToken) return;
@@ -168,6 +169,7 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
             )}
           </View>
         )}
+        <View style={{ height: tabBarHeight }} />
       </Screen>
     </View>
   );

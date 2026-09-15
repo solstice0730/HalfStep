@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { BlurView } from "expo-blur";
 import {
   ArrowLeft,
   Baby,
@@ -17,7 +18,11 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getMyProfile, updateBabyName } from "@/features/mypage/services/mypageService";
 import type { MyPageBaby, MyPageProfile } from "@/features/mypage/types/mypage";
 import { SubscriptionScreen } from "@/features/subscription/screens/SubscriptionScreen";
+import { GlassSurface } from "@/shared/components/GlassSurface";
+import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
+import { typography } from "@/shared/constants/typography";
 
 interface MyPageScreenProps {
   onClose: () => void;
@@ -107,96 +112,83 @@ export function MyPageScreen({ onClose }: MyPageScreenProps) {
   };
 
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={styles.root}>
-      <View style={styles.header}>
-        <Pressable accessibilityLabel="닫기" accessibilityRole="button" hitSlop={12} onPress={onClose} style={styles.headerButton}>
-          <ArrowLeft color={colors.primaryDark} size={22} />
-        </Pressable>
-        <Text style={styles.headerTitle}>마이페이지</Text>
-        <View style={styles.headerButton} />
-      </View>
-
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionLabel}>내 프로필</Text>
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <UserIcon color={colors.primary} size={26} />
-          </View>
-          <View style={styles.profileText}>
-            <Text style={styles.profileName}>{user?.nickname ?? "이름 없음"}</Text>
-            <Text style={styles.profileEmail}>{user?.email ?? "이메일 정보 없음"}</Text>
-          </View>
+    <View style={styles.root}>
+      <GradientBackdrop />
+      <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
+        <View style={styles.header}>
+          <Pressable accessibilityLabel="닫기" accessibilityRole="button" hitSlop={12} onPress={onClose} style={styles.headerButton}>
+            <ArrowLeft color={colors.primaryDark} size={22} />
+          </Pressable>
+          <Text style={styles.headerTitle}>마이페이지</Text>
+          <View style={styles.headerButton} />
         </View>
 
-        <Text style={styles.sectionLabel}>아이 프로필</Text>
-        {status === "loading" && <ActivityIndicator color={colors.primary} style={styles.spinner} />}
-        {status === "error" && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>불러오지 못했어요.</Text>
-            <Pressable onPress={load}>
-              <Text style={styles.retryText}>다시 시도</Text>
-            </Pressable>
-          </View>
-        )}
-        {status === "ready" && profile?.babies.length === 0 && <Text style={styles.emptyText}>등록된 아이 프로필이 없어요.</Text>}
-        {status === "ready" &&
-          profile?.babies.map((baby) => (
-            <Pressable key={baby.id} onPress={() => openBabyEdit(baby)} style={styles.row}>
-              <View style={styles.rowIcon}>
-                <Baby color={colors.primary} size={18} />
-              </View>
-              <View style={styles.rowText}>
-                <Text style={styles.rowTitle}>{baby.name}</Text>
-                <Text style={styles.rowSubtitle}>생후 {baby.ageInDays}일</Text>
-              </View>
-              <ChevronRight color={colors.textMuted} size={18} />
-            </Pressable>
-          ))}
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <Text style={styles.sectionLabel}>내 프로필</Text>
+          <GlassSurface radius={theme.radius.lg} intensity={32} contentStyle={styles.profileCard}>
+            <View style={styles.avatar}>
+              <UserIcon color={colors.primary} size={26} />
+            </View>
+            <View style={styles.profileText}>
+              <Text style={styles.profileName}>{user?.nickname ?? "이름 없음"}</Text>
+              <Text style={styles.profileEmail}>{user?.email ?? "이메일 정보 없음"}</Text>
+            </View>
+          </GlassSurface>
 
-        <Text style={styles.sectionLabel}>설정</Text>
-        <Pressable onPress={() => showComingSoon("알림 설정")} style={styles.row}>
-          <View style={styles.rowIcon}>
-            <Bell color={colors.primary} size={18} />
-          </View>
-          <Text style={styles.rowTitle}>알림 설정</Text>
-          <ChevronRight color={colors.textMuted} size={18} />
-        </Pressable>
-        <Pressable onPress={() => setSubscriptionOpen(true)} style={styles.row}>
-          <View style={styles.rowIcon}>
-            <CreditCard color={colors.primary} size={18} />
-          </View>
-          <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>구독 상태</Text>
-            <Text style={styles.rowSubtitle}>구독 기능 준비 중</Text>
-          </View>
-          <ChevronRight color={colors.textMuted} size={18} />
-        </Pressable>
+          <Text style={styles.sectionLabel}>아이 프로필</Text>
+          {status === "loading" && <ActivityIndicator color={colors.primary} style={styles.spinner} />}
+          {status === "error" && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>불러오지 못했어요.</Text>
+              <Pressable onPress={load}>
+                <Text style={styles.retryText}>다시 시도</Text>
+              </Pressable>
+            </View>
+          )}
+          {status === "ready" && profile?.babies.length === 0 && <Text style={styles.emptyText}>등록된 아이 프로필이 없어요.</Text>}
+          {status === "ready" &&
+            profile?.babies.map((baby) => (
+              <SettingsRow
+                key={baby.id}
+                icon={<Baby color={colors.primary} size={18} />}
+                title={baby.name}
+                subtitle={`생후 ${baby.ageInDays}일`}
+                onPress={() => openBabyEdit(baby)}
+              />
+            ))}
 
-        <Text style={styles.sectionLabel}>이용 안내</Text>
-        <Pressable onPress={() => showComingSoon("서비스 이용약관")} style={styles.row}>
-          <View style={styles.rowIcon}>
-            <FileText color={colors.primary} size={18} />
-          </View>
-          <Text style={styles.rowTitle}>서비스 이용약관</Text>
-          <ChevronRight color={colors.textMuted} size={18} />
-        </Pressable>
-        <Pressable onPress={() => showComingSoon("개인정보 처리방침")} style={styles.row}>
-          <View style={styles.rowIcon}>
-            <ShieldCheck color={colors.primary} size={18} />
-          </View>
-          <Text style={styles.rowTitle}>개인정보 처리방침</Text>
-          <ChevronRight color={colors.textMuted} size={18} />
-        </Pressable>
+          <Text style={styles.sectionLabel}>설정</Text>
+          <SettingsRow icon={<Bell color={colors.primary} size={18} />} title="알림 설정" onPress={() => showComingSoon("알림 설정")} />
+          <SettingsRow
+            icon={<CreditCard color={colors.primary} size={18} />}
+            title="구독 상태"
+            subtitle="구독 기능 준비 중"
+            onPress={() => setSubscriptionOpen(true)}
+          />
 
-        <Pressable onPress={handleLogout} style={styles.logoutButton}>
-          <LogOut color={colors.danger} size={18} />
-          <Text style={styles.logoutText}>로그아웃</Text>
-        </Pressable>
-      </ScrollView>
+          <Text style={styles.sectionLabel}>이용 안내</Text>
+          <SettingsRow
+            icon={<FileText color={colors.primary} size={18} />}
+            title="서비스 이용약관"
+            onPress={() => showComingSoon("서비스 이용약관")}
+          />
+          <SettingsRow
+            icon={<ShieldCheck color={colors.primary} size={18} />}
+            title="개인정보 처리방침"
+            onPress={() => showComingSoon("개인정보 처리방침")}
+          />
+
+          <Pressable onPress={handleLogout} style={styles.logoutButton}>
+            <LogOut color={colors.danger} size={18} />
+            <Text style={styles.logoutText}>로그아웃</Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
 
       <Modal animationType="fade" onRequestClose={() => setEditingBaby(null)} transparent visible={editingBaby !== null}>
         <View style={styles.editBackdrop}>
-          <View style={styles.editCard}>
+          <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+          <GlassSurface radius={theme.radius.xxl} intensity={55} style={styles.editCardShell} contentStyle={styles.editCard}>
             <Text style={styles.editTitle}>아이 이름 수정</Text>
             <TextInput
               onChangeText={setDraftName}
@@ -217,7 +209,7 @@ export function MyPageScreen({ onClose }: MyPageScreenProps) {
                 {isSaving ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.editSaveText}>저장</Text>}
               </Pressable>
             </View>
-          </View>
+          </GlassSurface>
         </View>
       </Modal>
       <Modal animationType="slide" onRequestClose={() => setSubscriptionOpen(false)} visible={subscriptionOpen}>
@@ -225,13 +217,81 @@ export function MyPageScreen({ onClose }: MyPageScreenProps) {
           <SubscriptionScreen onClose={() => setSubscriptionOpen(false)} />
         </SafeAreaProvider>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
+function SettingsRow({
+  icon,
+  title,
+  subtitle,
+  onPress
+}: {
+  icon: ReactNode;
+  title: string;
+  subtitle?: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress}>
+      {({ pressed }) => (
+        <GlassSurface
+          radius={theme.radius.lg}
+          intensity={26}
+          noShadow
+          style={pressed && rowStyles.pressed}
+          contentStyle={rowStyles.row}
+        >
+          <View style={rowStyles.rowIcon}>{icon}</View>
+          <View style={rowStyles.rowText}>
+            <Text style={rowStyles.rowTitle}>{title}</Text>
+            {subtitle ? <Text style={rowStyles.rowSubtitle}>{subtitle}</Text> : null}
+          </View>
+          <ChevronRight color={colors.textMuted} size={18} />
+        </GlassSurface>
+      )}
+    </Pressable>
+  );
+}
+
+const rowStyles = StyleSheet.create({
+  pressed: {
+    opacity: 0.7
+  },
+  row: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13
+  },
+  rowIcon: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: theme.radius.pill,
+    height: 34,
+    justifyContent: "center",
+    width: 34
+  },
+  rowText: {
+    flex: 1,
+    gap: 2
+  },
+  rowTitle: {
+    color: colors.primaryDark,
+    ...typography.subheadEmphasized
+  },
+  rowSubtitle: {
+    color: colors.textMuted,
+    ...typography.caption1
+  }
+});
+
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: colors.background,
+    flex: 1
+  },
+  safeArea: {
     flex: 1
   },
   header: {
@@ -250,8 +310,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: colors.primaryDark,
-    fontSize: 17,
-    fontWeight: "800"
+    ...typography.headline
   },
   body: {
     gap: 10,
@@ -260,24 +319,21 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     color: colors.textMuted,
-    fontSize: 12,
+    ...typography.caption1,
     fontWeight: "800",
-    marginTop: 14
+    marginTop: 14,
+    textTransform: "uppercase",
+    letterSpacing: 0.6
   },
   profileCard: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 18,
-    borderWidth: 1,
     flexDirection: "row",
-    gap: 14,
-    padding: 16
+    gap: 14
   },
   avatar: {
     alignItems: "center",
     backgroundColor: colors.surfaceSoft,
-    borderRadius: 999,
+    borderRadius: theme.radius.pill,
     height: 56,
     justifyContent: "center",
     width: 56
@@ -288,12 +344,11 @@ const styles = StyleSheet.create({
   },
   profileName: {
     color: colors.primaryDark,
-    fontSize: 17,
-    fontWeight: "800"
+    ...typography.headline
   },
   profileEmail: {
     color: colors.textMuted,
-    fontSize: 13
+    ...typography.footnote
   },
   spinner: {
     marginVertical: 8
@@ -305,50 +360,17 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: colors.textMuted,
-    fontSize: 13
+    ...typography.footnote
   },
   retryText: {
     color: colors.primary,
-    fontSize: 13,
+    ...typography.footnote,
     fontWeight: "800"
   },
   emptyText: {
     color: colors.textMuted,
-    fontSize: 13,
+    ...typography.footnote,
     paddingVertical: 4
-  },
-  row: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13
-  },
-  rowIcon: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
-    borderRadius: 999,
-    height: 34,
-    justifyContent: "center",
-    width: 34
-  },
-  rowText: {
-    flex: 1,
-    gap: 2
-  },
-  rowTitle: {
-    color: colors.primaryDark,
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "700"
-  },
-  rowSubtitle: {
-    color: colors.textMuted,
-    fontSize: 12
   },
   logoutButton: {
     alignItems: "center",
@@ -360,32 +382,29 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     color: colors.danger,
-    fontSize: 14,
-    fontWeight: "800"
+    ...typography.subheadEmphasized
   },
   editBackdrop: {
     alignItems: "center",
-    backgroundColor: "rgba(47,41,38,0.45)",
     flex: 1,
     justifyContent: "center",
     padding: 24
   },
-  editCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    gap: 14,
-    padding: 20,
+  editCardShell: {
     width: "100%"
+  },
+  editCard: {
+    gap: 14,
+    padding: 22
   },
   editTitle: {
     color: colors.primaryDark,
-    fontSize: 16,
-    fontWeight: "800"
+    ...typography.title3
   },
   editInput: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     color: colors.text,
     fontSize: 14,
@@ -399,19 +418,18 @@ const styles = StyleSheet.create({
   editCancelButton: {
     alignItems: "center",
     backgroundColor: colors.surfaceSoft,
-    borderRadius: 999,
+    borderRadius: theme.radius.pill,
     flex: 1,
     paddingVertical: 12
   },
   editCancelText: {
     color: colors.primaryDark,
-    fontSize: 14,
-    fontWeight: "700"
+    ...typography.subheadEmphasized
   },
   editSaveButton: {
     alignItems: "center",
     backgroundColor: colors.primary,
-    borderRadius: 999,
+    borderRadius: theme.radius.pill,
     flex: 1,
     paddingVertical: 12
   },
@@ -420,7 +438,6 @@ const styles = StyleSheet.create({
   },
   editSaveText: {
     color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800"
+    ...typography.subheadEmphasized
   }
 });
