@@ -4,6 +4,7 @@ import { ArrowLeft, ImagePlus, X } from "lucide-react-native";
 import { useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { createPost } from "@/features/community/services/communityService";
@@ -20,7 +21,11 @@ import {
 import type { AppStackParamList } from "@/navigation/AppStackNavigator";
 import { ApiRequestError } from "@/services/api/apiClient";
 import { uploadImages } from "@/services/api/uploadApi";
+import { GlassSurface } from "@/shared/components/GlassSurface";
+import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
+import { typography } from "@/shared/constants/typography";
 
 type Props = NativeStackScreenProps<AppStackParamList, "CommunityWrite">;
 
@@ -96,10 +101,14 @@ export function CommunityWriteScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.root}>
+    <View style={styles.rootWrap}>
+      <GradientBackdrop />
+      <SafeAreaView style={styles.root}>
       <View style={styles.header}>
-        <Pressable accessibilityLabel="뒤로가기" hitSlop={12} onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft color={colors.primaryDark} size={22} />
+        <Pressable accessibilityLabel="뒤로가기" hitSlop={12} onPress={() => navigation.goBack()}>
+          <GlassSurface radius={theme.radius.pill} intensity={28} noShadow contentStyle={styles.backButton}>
+            <ArrowLeft color={colors.primaryDark} size={22} />
+          </GlassSurface>
         </Pressable>
         <Text style={styles.headerTitle}>글쓰기</Text>
         <View style={styles.headerSpacer} />
@@ -181,17 +190,22 @@ export function CommunityWriteScreen({ navigation }: Props) {
 
         {error && <Text style={styles.errorText}>{error}</Text>}
 
-        <Pressable disabled={!canSubmit} onPress={handleSubmit} style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}>
-          {submitting ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.submitButtonText}>게시하기</Text>}
+        <Pressable disabled={!canSubmit} onPress={handleSubmit} style={!canSubmit && styles.submitButtonDisabled}>
+          <LinearGradient colors={["#F2B6BF", colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.submitButton}>
+            {submitting ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.submitButtonText}>게시하기</Text>}
+          </LinearGradient>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  rootWrap: {
+    flex: 1
+  },
   root: {
-    backgroundColor: colors.background,
     flex: 1
   },
   header: {
@@ -203,8 +217,6 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 999,
     height: 40,
     justifyContent: "center",
     width: 40
@@ -214,8 +226,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: colors.primaryDark,
-    fontSize: 16,
-    fontWeight: "900"
+    ...typography.headline
   },
   body: {
     gap: 10,
@@ -234,7 +245,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   chip: {
-    backgroundColor: colors.surface,
+    backgroundColor: "rgba(255,255,255,0.55)",
     borderColor: colors.border,
     borderRadius: 999,
     borderWidth: 1,
@@ -254,8 +265,8 @@ const styles = StyleSheet.create({
     color: "#FFFFFF"
   },
   input: {
-    backgroundColor: "#FFFFFF",
-    borderColor: colors.border,
+    backgroundColor: "rgba(255,255,255,0.6)",
+    borderColor: "rgba(255,255,255,0.9)",
     borderRadius: 16,
     borderWidth: 1,
     color: colors.text,
@@ -264,8 +275,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14
   },
   textArea: {
-    backgroundColor: "#FFFFFF",
-    borderColor: colors.border,
+    backgroundColor: "rgba(255,255,255,0.6)",
+    borderColor: "rgba(255,255,255,0.9)",
     borderRadius: 20,
     borderWidth: 1,
     color: colors.text,
@@ -329,7 +340,6 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     alignItems: "center",
-    backgroundColor: colors.primary,
     borderRadius: 999,
     marginTop: 8,
     paddingVertical: 16

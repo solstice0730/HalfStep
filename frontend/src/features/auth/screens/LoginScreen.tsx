@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
-import { Globe, MessageCircle, ShieldCheck } from "lucide-react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Globe, MessageCircle } from "lucide-react-native";
 import * as WebBrowser from "expo-web-browser";
 
 import { env } from "@/config/env";
@@ -53,14 +52,9 @@ export function LoginScreen() {
     <View style={styles.root}>
       <GradientBackdrop />
       <View style={styles.header}>
-        <LinearGradient
-          colors={["#F2B6BF", colors.primary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.mark}
-        >
-          <ShieldCheck color="#FFFFFF" size={30} />
-        </LinearGradient>
+        <View style={styles.mark}>
+          <Image source={require("../../../../assets/images/login-icon.jpg")} resizeMode="cover" style={styles.markImage} />
+        </View>
         <Text style={styles.title}>HalfStep</Text>
         <Text style={styles.subtitle}>아이의 하루 기록을 안전하게 이어가세요.</Text>
       </View>
@@ -215,17 +209,21 @@ const styles = StyleSheet.create({
     marginBottom: 34
   },
   mark: {
-    alignItems: "center",
-    borderRadius: theme.radius.xl,
-    height: 68,
-    justifyContent: "center",
+    borderRadius: 24,
+    height: 88,
     marginBottom: 18,
+    overflow: "hidden",
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.22,
     shadowRadius: 20,
     elevation: 4,
-    width: 68
+    width: 88
+  },
+  markImage: {
+    height: "100%",
+    transform: [{ scale: 1.06 }],
+    width: "100%"
   },
   title: {
     color: colors.primaryDark,

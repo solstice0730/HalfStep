@@ -10,7 +10,11 @@ import { getPostById } from "@/features/community/services/communityService";
 import { CATEGORY_LABELS, type CommunityPostDetail } from "@/features/community/types/community";
 import type { AppStackParamList } from "@/navigation/AppStackNavigator";
 import { ApiRequestError } from "@/services/api/apiClient";
+import { GlassSurface } from "@/shared/components/GlassSurface";
+import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
+import { typography } from "@/shared/constants/typography";
 
 type Props = NativeStackScreenProps<AppStackParamList, "CommunityDetail">;
 
@@ -54,10 +58,14 @@ export function CommunityDetailScreen({ route, navigation }: Props) {
   );
 
   return (
-    <SafeAreaView style={styles.root}>
+    <View style={styles.rootWrap}>
+      <GradientBackdrop />
+      <SafeAreaView style={styles.root}>
       <View style={styles.header}>
-        <Pressable accessibilityLabel="뒤로가기" hitSlop={12} onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft color={colors.primaryDark} size={22} />
+        <Pressable accessibilityLabel="뒤로가기" hitSlop={12} onPress={() => navigation.goBack()}>
+          <GlassSurface radius={theme.radius.pill} intensity={28} noShadow contentStyle={styles.backButton}>
+            <ArrowLeft color={colors.primaryDark} size={22} />
+          </GlassSurface>
         </Pressable>
         <Text style={styles.headerTitle}>게시글</Text>
         <View style={styles.headerSpacer} />
@@ -104,12 +112,15 @@ export function CommunityDetailScreen({ route, navigation }: Props) {
         </ScrollView>
       )}
     </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  rootWrap: {
+    flex: 1
+  },
   root: {
-    backgroundColor: colors.background,
     flex: 1
   },
   header: {
@@ -121,8 +132,6 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 999,
     height: 40,
     justifyContent: "center",
     width: 40
@@ -132,8 +141,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: colors.primaryDark,
-    fontSize: 16,
-    fontWeight: "900"
+    ...typography.headline
   },
   centerSpinner: {
     marginTop: 40

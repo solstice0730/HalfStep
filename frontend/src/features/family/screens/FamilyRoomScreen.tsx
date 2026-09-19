@@ -1,8 +1,10 @@
 import { CheckCircle2, Wifi } from "lucide-react-native";
 import { Image, ImageSourcePropType, StyleSheet, Text, View } from "react-native";
 
+import { GlassSurface } from "@/shared/components/GlassSurface";
 import { Screen } from "@/shared/components/Screen";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
 
 const familyIcons = {
   defaultAvatar: require("../../../../assets/icons/family/avatar-default.png"),
@@ -48,7 +50,7 @@ export function FamilyRoomScreen() {
           <Text style={styles.kicker}>공유 돌봄방</Text>
           <View style={styles.roomList}>
             {rooms.map((room) => (
-              <View key={room.title} style={[styles.roomCard, room.active && styles.roomCardActive]}>
+              <GlassSurface key={room.title} radius={theme.radius.md} intensity={30} noShadow style={room.active && styles.roomCardActive} contentStyle={styles.roomCard}>
                 <View style={styles.roomLeft}>
                   <View style={[styles.roomIcon, room.active && styles.roomIconActive]}>
                     <Image source={room.icon} style={styles.roomIconImage} />
@@ -69,7 +71,7 @@ export function FamilyRoomScreen() {
                   ))}
                   {room.active && <Text style={styles.activeBadge}>활성</Text>}
                 </View>
-              </View>
+              </GlassSurface>
             ))}
           </View>
         </View>
@@ -98,7 +100,7 @@ export function FamilyRoomScreen() {
 
         <View style={styles.feedList}>
           {feeds.map((feed) => (
-            <View key={`${feed.text}-${feed.time}`} style={styles.feedCard}>
+            <GlassSurface key={`${feed.text}-${feed.time}`} radius={theme.radius.md} intensity={26} noShadow contentStyle={styles.feedCard}>
               <View style={styles.feedAvatar}>
                 <Image source={feed.icon} style={styles.feedAvatarImage} />
               </View>
@@ -111,7 +113,7 @@ export function FamilyRoomScreen() {
               <View style={styles.feedAction}>
                 <CheckCircle2 color={colors.primary} size={16} />
               </View>
-            </View>
+            </GlassSurface>
           ))}
         </View>
       </Screen>
@@ -124,11 +126,11 @@ export function FamilyRoomScreen() {
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: colors.background,
     flex: 1
   },
   topNav: {
     alignItems: "center",
+    backgroundColor: colors.backgroundTop,
     borderBottomColor: colors.border,
     borderBottomWidth: 1,
     flexDirection: "row",
@@ -157,17 +159,13 @@ const styles = StyleSheet.create({
   },
   roomCard: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
     padding: 16
   },
   roomCardActive: {
-    backgroundColor: colors.blueSoft,
     borderColor: colors.primary,
+    borderRadius: 16,
     borderWidth: 1.5
   },
   roomLeft: {
@@ -328,10 +326,6 @@ const styles = StyleSheet.create({
   },
   feedCard: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 1,
     flexDirection: "row",
     gap: 12,
     padding: 16

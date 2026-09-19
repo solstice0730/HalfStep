@@ -10,7 +10,11 @@ import { useBaby } from "@/features/baby/hooks/useBaby";
 import { getCalendarDay, getCalendarMonth, type CalendarDiary, type CalendarTimelineItem } from "@/features/calendar/services/calendarApi";
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { ApiRequestError } from "@/services/api/apiClient";
+import { GlassSurface } from "@/shared/components/GlassSurface";
+import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
+import { typography } from "@/shared/constants/typography";
 
 type CalendarScreenProps = BottomTabScreenProps<MainTabParamList, "Calendar">;
 
@@ -121,12 +125,14 @@ export function CalendarScreen(_props: CalendarScreenProps) {
   const tabBarHeight = useBottomTabBarHeight();
 
   return (
-    <SafeAreaView edges={["top"]} style={styles.root}>
+    <View style={styles.root}>
+    <GradientBackdrop />
+    <SafeAreaView edges={["top"]} style={styles.safeArea}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>캘린더</Text>
       </View>
       <ScrollView contentContainerStyle={[styles.body, { paddingBottom: 32 + tabBarHeight }]}>
-        <View style={styles.monthCard}>
+        <GlassSurface radius={theme.radius.xl} intensity={34} contentStyle={styles.monthCard}>
           <View style={styles.monthHeader}>
             <Pressable accessibilityLabel="이전 달" hitSlop={10} onPress={() => goToMonth(-1)}>
               <ChevronLeft color={colors.primaryDark} size={22} />
@@ -176,9 +182,9 @@ export function CalendarScreen(_props: CalendarScreenProps) {
               })}
             </View>
           )}
-        </View>
+        </GlassSurface>
 
-        <View style={styles.detailCard}>
+        <GlassSurface radius={theme.radius.xl} intensity={34} contentStyle={styles.detailCard}>
           <Text style={styles.detailTitle}>{selectedDate} 기록</Text>
 
           {dayStatus === "loading" && <ActivityIndicator color={colors.primary} />}
@@ -224,15 +230,18 @@ export function CalendarScreen(_props: CalendarScreenProps) {
               )}
             </>
           )}
-        </View>
+        </GlassSurface>
       </ScrollView>
     </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: colors.background,
+    flex: 1
+  },
+  safeArea: {
     flex: 1
   },
   header: {
@@ -241,8 +250,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: colors.primaryDark,
-    fontSize: 26,
-    fontWeight: "800"
+    ...typography.title1
   },
   body: {
     gap: 14,
@@ -251,10 +259,6 @@ const styles = StyleSheet.create({
     paddingTop: 14
   },
   monthCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: colors.border,
-    borderRadius: 26,
-    borderWidth: 1,
     padding: 14
   },
   monthHeader: {
@@ -335,12 +339,8 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   detailCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: colors.border,
-    borderRadius: 26,
-    borderWidth: 1,
     gap: 12,
-    padding: 16
+    padding: 18
   },
   detailTitle: {
     color: colors.primaryDark,
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   diaryCard: {
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: "rgba(255,241,236,0.7)",
     borderRadius: 18,
     gap: 6,
     padding: 14

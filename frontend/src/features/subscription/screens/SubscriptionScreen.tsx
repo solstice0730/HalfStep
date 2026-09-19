@@ -1,9 +1,14 @@
 import { ArrowLeft, Check, Crown, Sparkles } from "lucide-react-native";
 import { ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 
 import type { PlanComparisonRow } from "@/features/subscription/types/subscription";
+import { GlassSurface } from "@/shared/components/GlassSurface";
+import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
+import { typography } from "@/shared/constants/typography";
 
 interface SubscriptionScreenProps {
   onClose: () => void;
@@ -24,7 +29,9 @@ const comparisonRows: PlanComparisonRow[] = [
 
 export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={styles.root}>
+    <View style={styles.root}>
+      <GradientBackdrop />
+      <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
       <View style={styles.header}>
         <Pressable accessibilityLabel="닫기" accessibilityRole="button" hitSlop={12} onPress={onClose} style={styles.headerButton}>
           <ArrowLeft color={colors.primaryDark} size={22} />
@@ -35,14 +42,14 @@ export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <Crown color={colors.primary} size={28} />
-          </View>
+          <LinearGradient colors={["#F2B6BF", colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroIcon}>
+            <Crown color="#FFFFFF" size={28} />
+          </LinearGradient>
           <Text style={styles.heroTitle}>HalfStep 구독</Text>
           <Text style={styles.heroSubtitle}>7일 체험 후 월 8,900원 구독으로 계속 이용해요</Text>
         </View>
 
-        <View style={styles.priceCard}>
+        <GlassSurface radius={theme.radius.xl} intensity={36} contentStyle={styles.priceCard}>
           <View style={styles.priceRow}>
             <Text style={styles.priceValue}>{HYPOTHETICAL_PRICE}</Text>
             <View style={styles.priceBadge}>
@@ -53,10 +60,10 @@ export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
             체험 7일이 끝나면 구독 결제 없이는 계속 이용할 수 없어요. 별도로 무료로 쓸 수 있는 단계는 없습니다.
             이 화면은 BM 검증용이라 실제로 청구되지 않아요.
           </Text>
-        </View>
+        </GlassSurface>
 
         <Text style={styles.sectionLabel}>7일 체험 · 구독 후 비교</Text>
-        <View style={styles.tableCard}>
+        <GlassSurface radius={theme.radius.xl} intensity={36} noShadow contentStyle={styles.tableCard}>
           <View style={styles.tableHeaderRow}>
             <Text style={[styles.tableHeaderCell, styles.featureColumn]}>기능</Text>
             <Text style={[styles.tableHeaderCell, styles.tierHeaderCell]}>7일 체험</Text>
@@ -79,10 +86,10 @@ export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
               </View>
             </View>
           ))}
-        </View>
+        </GlassSurface>
         <Text style={styles.quotaFootnote}>* AI 기능의 월 사용량·과금 정책은 아직 확정되지 않았어요.</Text>
 
-        <View style={styles.valueCard}>
+        <GlassSurface radius={theme.radius.xl} intensity={30} noShadow contentStyle={styles.valueCard}>
           <View style={styles.valueHeader}>
             <Sparkles color={colors.primary} size={16} />
             <Text style={styles.valueTitle}>구독으로 계속 이용하는 것</Text>
@@ -92,23 +99,28 @@ export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
             있고, 다른 부모들과 커뮤니티에서 정보를 나눌 수 있어요. 이 기능들은 7일 체험 후에는 구독을 통해서만 계속
             이용할 수 있어요.
           </Text>
-        </View>
+        </GlassSurface>
 
-        <Pressable disabled style={styles.upgradeButton}>
-          <Text style={styles.upgradeButtonText}>구독 시작하기</Text>
-          <View style={styles.upgradeBadge}>
-            <Text style={styles.upgradeBadgeText}>준비 중</Text>
-          </View>
+        <Pressable disabled style={styles.upgradeButtonWrap}>
+          <LinearGradient colors={["#4A413A", colors.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.upgradeButton}>
+            <Text style={styles.upgradeButtonText}>구독 시작하기</Text>
+            <View style={styles.upgradeBadge}>
+              <Text style={styles.upgradeBadgeText}>준비 중</Text>
+            </View>
+          </LinearGradient>
         </Pressable>
         <Text style={styles.disclaimer}>실제 결제는 아직 지원하지 않아요. 가격은 검토 중이며 바뀔 수 있습니다.</Text>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: colors.background,
+    flex: 1
+  },
+  safeArea: {
     flex: 1
   },
   header: {
@@ -127,8 +139,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: colors.primaryDark,
-    fontSize: 17,
-    fontWeight: "800"
+    ...typography.headline
   },
   body: {
     gap: 14,
@@ -142,7 +153,6 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
     borderRadius: 999,
     height: 56,
     justifyContent: "center",
@@ -160,12 +170,7 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   priceCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 18,
-    borderWidth: 1,
-    gap: 8,
-    padding: 16
+    gap: 8
   },
   priceRow: {
     alignItems: "center",
@@ -201,14 +206,10 @@ const styles = StyleSheet.create({
     marginTop: 4
   },
   tableCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 18,
-    borderWidth: 1,
-    overflow: "hidden"
+    padding: 0
   },
   tableHeaderRow: {
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: "rgba(255,241,236,0.7)",
     flexDirection: "row",
     paddingHorizontal: 12,
     paddingVertical: 10
@@ -261,10 +262,7 @@ const styles = StyleSheet.create({
     marginTop: -6
   },
   valueCard: {
-    backgroundColor: colors.blueSoft,
-    borderRadius: 18,
-    gap: 8,
-    padding: 16
+    gap: 8
   },
   valueHeader: {
     alignItems: "center",
@@ -281,15 +279,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 19
   },
+  upgradeButtonWrap: {
+    marginTop: 8,
+    opacity: 0.55
+  },
   upgradeButton: {
     alignItems: "center",
-    backgroundColor: colors.secondary,
     borderRadius: 999,
     flexDirection: "row",
     gap: 8,
     justifyContent: "center",
-    marginTop: 8,
-    opacity: 0.55,
     paddingVertical: 15
   },
   upgradeButtonText: {
