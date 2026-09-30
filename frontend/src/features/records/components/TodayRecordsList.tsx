@@ -8,7 +8,9 @@ import {
   URINE_COLOR_LABELS,
   type TodayRecords
 } from "@/features/records/types/records";
+import { GlassSurface } from "@/shared/components/GlassSurface";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
 
 interface TodayRecordsListProps {
   records: TodayRecords;
@@ -48,20 +50,20 @@ export function TodayRecordsList({ records }: TodayRecordsListProps) {
 
   if (rows.length === 0) {
     return (
-      <View style={styles.empty}>
+      <GlassSurface radius={theme.radius.lg} intensity={28} noShadow contentStyle={styles.empty}>
         <Text style={styles.emptyText}>오늘 기록된 내용이 없어요.</Text>
-      </View>
+      </GlassSurface>
     );
   }
 
   return (
-    <View style={styles.list}>
+    <GlassSurface radius={theme.radius.lg} intensity={30} contentStyle={styles.list}>
       {rows.map((row) => (
         <Text key={row.key} style={styles.row}>
           {row.text}
         </Text>
       ))}
-    </View>
+    </GlassSurface>
   );
 }
 
@@ -75,7 +77,7 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   empty: {
-    paddingVertical: 8
+    paddingVertical: 14
   },
   emptyText: {
     color: colors.textMuted,

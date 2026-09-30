@@ -100,8 +100,8 @@ const styles = StyleSheet.create({
   },
   emptyBox: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: "rgba(255,255,255,0.5)",
+    borderColor: "rgba(255,255,255,0.9)",
     borderRadius: 20,
     borderStyle: "dashed",
     borderWidth: 1,
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     width: 22
   },
   descriptionInput: {
-    backgroundColor: colors.surface,
+    backgroundColor: "rgba(255,255,255,0.75)",
     borderColor: colors.border,
     borderRadius: 10,
     borderWidth: 1,
@@ -154,8 +154,8 @@ const styles = StyleSheet.create({
   },
   addMoreBox: {
     alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
-    borderColor: colors.border,
+    backgroundColor: "rgba(255,255,255,0.5)",
+    borderColor: "rgba(255,255,255,0.9)",
     borderRadius: 16,
     borderStyle: "dashed",
     borderWidth: 1,

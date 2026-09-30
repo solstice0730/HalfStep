@@ -1,6 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
 import type { CompositeScreenProps } from "@react-navigation/native";
-import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import { useBottomTabBarHeight, type BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Sparkles, X } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -18,6 +18,7 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useBaby } from "@/features/baby/hooks/useBaby";
@@ -48,8 +49,12 @@ import { AiRequestError, generateDiary } from "@/services/api/aiApi";
 import { ApiRequestError } from "@/services/api/apiClient";
 import { uploadImage, type LocalImage } from "@/services/api/uploadApi";
 import { ErrorState } from "@/shared/components/ErrorState";
+import { GlassSurface } from "@/shared/components/GlassSurface";
+import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
 import { LoadingState } from "@/shared/components/LoadingState";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
+import { typography } from "@/shared/constants/typography";
 
 type RecordsScreenProps = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Records">,
@@ -70,6 +75,7 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
   const { accessToken, signOut } = useAuth();
   const { activeBaby } = useBaby();
   const processedCameraUri = useRef<string | undefined>(undefined);
+  const tabBarHeight = useBottomTabBarHeight();
 
   const selectedDate = route.params?.selectedDate ?? todayIsoDate();
   const [recordsStatus, setRecordsStatus] = useState<AsyncStatus>("loading");
@@ -246,29 +252,22 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
 
   return (
     <View style={styles.root}>
+      <GradientBackdrop />
       <SafeAreaView style={styles.fixedArea}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editorFlex}>
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <TouchableWithoutFeedback onPress={Platform.OS === "web" ? undefined : Keyboard.dismiss} accessible={false}>
             <View style={styles.editorFlex}>
               <View style={styles.header}>
                 <Text style={styles.navEyebrow}>{displayDate(selectedDate)}</Text>
                 <Text style={styles.navTitle}>{selectedDate === todayIsoDate() ? "오늘의 기록" : "선택한 날짜의 기록"}</Text>
               </View>
 
-              <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.editorBody}>
+              <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.editorBody, { paddingBottom: 32 + tabBarHeight }]}>
                 <View style={styles.categoryRow}>
-                  <Pressable style={styles.categoryButton} onPress={() => setActiveRecordModal("feeding")}>
-                    <Text style={styles.categoryButtonText}>+ 수유</Text>
-                  </Pressable>
-                  <Pressable style={styles.categoryButton} onPress={() => setActiveRecordModal("sleep")}>
-                    <Text style={styles.categoryButtonText}>+ 수면</Text>
-                  </Pressable>
-                  <Pressable style={styles.categoryButton} onPress={() => setActiveRecordModal("urine")}>
-                    <Text style={styles.categoryButtonText}>+ 소변</Text>
-                  </Pressable>
-                  <Pressable style={styles.categoryButton} onPress={() => setActiveRecordModal("stool")}>
-                    <Text style={styles.categoryButtonText}>+ 대변</Text>
-                  </Pressable>
+                  <CategoryButton label="+ 수유" onPress={() => setActiveRecordModal("feeding")} />
+                  <CategoryButton label="+ 수면" onPress={() => setActiveRecordModal("sleep")} />
+                  <CategoryButton label="+ 소변" onPress={() => setActiveRecordModal("urine")} />
+                  <CategoryButton label="+ 대변" onPress={() => setActiveRecordModal("stool")} />
                 </View>
 
                 {recordsStatus === "loading" && <LoadingState />}
@@ -309,17 +308,19 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
 
                 <Pressable
                   disabled={!canGenerate || aiStatus === "loading"}
-                  style={[styles.generateButton, (!canGenerate || aiStatus === "loading") && styles.generateButtonDisabled]}
+                  style={(!canGenerate || aiStatus === "loading") && styles.generateButtonDisabled}
                   onPress={handleGenerateDiary}
                 >
-                  {aiStatus === "loading" ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
-                  ) : (
-                    <>
-                      <Sparkles color="#FFFFFF" size={16} />
-                      <Text style={styles.generateButtonText}>{aiStatus === "error" ? "다시 시도" : "AI 육아일기 만들기"}</Text>
-                    </>
-                  )}
+                  <LinearGradient colors={["#F2B6BF", colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.generateButton}>
+                    {aiStatus === "loading" ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <>
+                        <Sparkles color="#FFFFFF" size={16} />
+                        <Text style={styles.generateButtonText}>{aiStatus === "error" ? "다시 시도" : "AI 육아일기 만들기"}</Text>
+                      </>
+                    )}
+                  </LinearGradient>
                 </Pressable>
               </ScrollView>
             </View>
@@ -343,13 +344,23 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
   );
 }
 
+function CategoryButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable style={styles.categoryButtonFlex} onPress={onPress}>
+      {({ pressed }) => (
+        <GlassSurface radius={theme.radius.md} intensity={24} noShadow style={pressed && styles.pressed} contentStyle={styles.categoryButton}>
+          <Text style={styles.categoryButtonText}>{label}</Text>
+        </GlassSurface>
+      )}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: colors.background,
     flex: 1
   },
   fixedArea: {
-    backgroundColor: colors.background,
     flex: 1
   },
   editorFlex: {
@@ -367,8 +378,7 @@ const styles = StyleSheet.create({
   },
   navTitle: {
     color: colors.primaryDark,
-    fontSize: 26,
-    fontWeight: "800"
+    ...typography.title1
   },
   editorBody: {
     gap: 14,
@@ -381,14 +391,15 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8
   },
+  categoryButtonFlex: {
+    flexGrow: 1,
+    minWidth: "22%"
+  },
+  pressed: {
+    opacity: 0.72
+  },
   categoryButton: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    flexGrow: 1,
-    minWidth: "22%",
     paddingVertical: 12
   },
   categoryButtonText: {
@@ -402,8 +413,8 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   memoInput: {
-    backgroundColor: "#FFFFFF",
-    borderColor: colors.border,
+    backgroundColor: "rgba(255,255,255,0.6)",
+    borderColor: "rgba(255,255,255,0.9)",
     borderRadius: 20,
     borderWidth: 1,
     color: colors.text,
@@ -435,7 +446,6 @@ const styles = StyleSheet.create({
   },
   generateButton: {
     alignItems: "center",
-    backgroundColor: colors.primary,
     borderRadius: 999,
     flexDirection: "row",
     gap: 8,

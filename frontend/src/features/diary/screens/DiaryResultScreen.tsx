@@ -14,6 +14,7 @@ import {
   TextInput,
   View
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 import type { AppStackParamList } from "@/navigation/AppStackNavigator";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -23,7 +24,11 @@ import type { DiaryGenerationResponse } from "@/features/records/types/records";
 import { saveDiary } from "@/features/diary/services/diaryService";
 import { ApiRequestError } from "@/services/api/apiClient";
 import { uploadImages } from "@/services/api/uploadApi";
+import { GlassSurface } from "@/shared/components/GlassSurface";
+import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
+import { typography } from "@/shared/constants/typography";
 
 type DiaryResultScreenProps = NativeStackScreenProps<AppStackParamList, "DiaryResult">;
 
@@ -112,23 +117,24 @@ export function DiaryResultScreen({ route, navigation }: DiaryResultScreenProps)
   };
 
   return (
+    <View style={styles.rootWrap}>
+    <GradientBackdrop />
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.root}>
       <View style={styles.header}>
-        <Pressable hitSlop={12} style={styles.iconButton} onPress={handleCancel}>
-          <X color={colors.primaryDark} size={22} />
+        <Pressable hitSlop={12} onPress={handleCancel}>
+          <GlassSurface radius={theme.radius.pill} intensity={28} noShadow contentStyle={styles.iconButton}>
+            <X color={colors.primaryDark} size={22} />
+          </GlassSurface>
         </Pressable>
         <Text style={styles.headerTitle}>AI 육아일지</Text>
-        <Pressable
-          disabled={regenerateStatus === "loading"}
-          hitSlop={12}
-          style={styles.iconButton}
-          onPress={handleRegenerate}
-        >
-          {regenerateStatus === "loading" ? (
-            <ActivityIndicator color={colors.primary} size="small" />
-          ) : (
-            <RefreshCw color={colors.primaryDark} size={20} />
-          )}
+        <Pressable disabled={regenerateStatus === "loading"} hitSlop={12} onPress={handleRegenerate}>
+          <GlassSurface radius={theme.radius.pill} intensity={28} noShadow contentStyle={styles.iconButton}>
+            {regenerateStatus === "loading" ? (
+              <ActivityIndicator color={colors.primary} size="small" />
+            ) : (
+              <RefreshCw color={colors.primaryDark} size={20} />
+            )}
+          </GlassSurface>
         </Pressable>
       </View>
 
@@ -202,26 +208,28 @@ export function DiaryResultScreen({ route, navigation }: DiaryResultScreenProps)
         </Pressable>
         <Pressable
           disabled={titleInvalid || contentInvalid || saveStatus === "loading"}
-          style={[
-            styles.saveButton,
-            (titleInvalid || contentInvalid || saveStatus === "loading") && styles.saveButtonDisabled
-          ]}
+          style={[styles.saveButtonFlex, (titleInvalid || contentInvalid || saveStatus === "loading") && styles.saveButtonDisabled]}
           onPress={handleSave}
         >
-          {saveStatus === "loading" ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <Text style={styles.saveButtonText}>{saveStatus === "error" ? "다시 저장" : "저장"}</Text>
-          )}
+          <LinearGradient colors={["#F2B6BF", colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.saveButton}>
+            {saveStatus === "loading" ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.saveButtonText}>{saveStatus === "error" ? "다시 저장" : "저장"}</Text>
+            )}
+          </LinearGradient>
         </Pressable>
       </View>
     </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  rootWrap: {
+    flex: 1
+  },
   root: {
-    backgroundColor: colors.background,
     flex: 1
   },
   header: {
@@ -234,13 +242,10 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: colors.primaryDark,
-    fontSize: 17,
-    fontWeight: "900"
+    ...typography.headline
   },
   iconButton: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 999,
     height: 40,
     justifyContent: "center",
     width: 40
@@ -261,7 +266,7 @@ const styles = StyleSheet.create({
   },
   photoEmpty: {
     alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: "rgba(255,255,255,0.5)",
     borderRadius: 20,
     justifyContent: "center",
     paddingVertical: 28
@@ -277,8 +282,8 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   titleInput: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: "rgba(255,255,255,0.6)",
+    borderColor: "rgba(255,255,255,0.9)",
     borderRadius: 16,
     borderWidth: 1,
     color: colors.text,
@@ -288,8 +293,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12
   },
   contentInput: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: "rgba(255,255,255,0.6)",
+    borderColor: "rgba(255,255,255,0.9)",
     borderRadius: 18,
     borderWidth: 1,
     color: colors.text,
@@ -354,7 +359,7 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: "rgba(255,255,255,0.55)",
     borderRadius: 18,
     flex: 1,
     paddingVertical: 14
@@ -364,11 +369,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "900"
   },
+  saveButtonFlex: {
+    flex: 2
+  },
   saveButton: {
     alignItems: "center",
-    backgroundColor: colors.primary,
     borderRadius: 18,
-    flex: 2,
     paddingVertical: 14
   },
   saveButtonDisabled: {

@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { X } from "lucide-react-native";
+import { BlurView } from "expo-blur";
 
 import { TimePickerField, nowAsTimeValue, type TimeValue } from "@/features/records/components/TimePickerField";
 import { FEEDING_TYPE_LABELS, type FeedingType } from "@/features/records/types/records";
+import { GlassSurface } from "@/shared/components/GlassSurface";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
 
 interface FeedingRecordModalProps {
   visible: boolean;
@@ -41,7 +44,8 @@ export function FeedingRecordModal({ visible, isSaving, onClose, onSave }: Feedi
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+        <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
+        <GlassSurface radius={theme.radius.xxl} intensity={55} contentStyle={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>수유 기록</Text>
             <Pressable onPress={onClose}>
@@ -84,7 +88,7 @@ export function FeedingRecordModal({ visible, isSaving, onClose, onSave }: Feedi
               {isSaving ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.saveButtonText}>저장</Text>}
             </Pressable>
           </View>
-        </View>
+        </GlassSurface>
       </View>
     </Modal>
   );
@@ -92,14 +96,11 @@ export function FeedingRecordModal({ visible, isSaving, onClose, onSave }: Feedi
 
 const styles = StyleSheet.create({
   backdrop: {
-    backgroundColor: "rgba(45,37,32,0.36)",
     flex: 1,
     justifyContent: "flex-end",
     padding: 16
   },
   sheet: {
-    backgroundColor: colors.background,
-    borderRadius: 28,
     gap: 14,
     padding: 18
   },

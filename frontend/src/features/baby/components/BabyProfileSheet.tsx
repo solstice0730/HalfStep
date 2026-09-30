@@ -1,10 +1,13 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { BlurView } from "expo-blur";
 
 import { useBaby } from "@/features/baby/hooks/useBaby";
 import type { Baby, BabyGender } from "@/features/baby/types/baby";
+import { GlassSurface } from "@/shared/components/GlassSurface";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
 
 type Props = { visible: boolean; onClose: () => void };
 const genderOptions: Array<{ value: BabyGender; label: string }> = [
@@ -55,7 +58,9 @@ export function BabyProfileSheet({ visible, onClose }: Props) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={() => undefined}>
+        <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill} />
+        <Pressable onPress={() => undefined}>
+          <GlassSurface radius={theme.radius.xxl} intensity={55} contentStyle={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>아기 프로필</Text>
             <Pressable accessibilityLabel="닫기" onPress={onClose} style={styles.iconButton}><X color={colors.primaryDark} size={20} /></Pressable>
@@ -84,6 +89,7 @@ export function BabyProfileSheet({ visible, onClose }: Props) {
           ) : (
             <Pressable onPress={() => { resetForm(); setIsAdding(true); }} style={styles.add}><Plus color="#FFFFFF" size={18} /><Text style={styles.addText}>아기 추가</Text></Pressable>
           )}
+          </GlassSurface>
         </Pressable>
       </Pressable>
     </Modal>
@@ -91,17 +97,17 @@ export function BabyProfileSheet({ visible, onClose }: Props) {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { backgroundColor: "rgba(47,41,38,0.38)", flex: 1, justifyContent: "flex-end" },
-  sheet: { backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "82%", padding: 18 },
+  backdrop: { flex: 1, justifyContent: "flex-end", padding: 16 },
+  sheet: { maxHeight: "82%", padding: 18 },
   header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   title: { color: colors.primaryDark, fontSize: 20, fontWeight: "900" },
   iconButton: { alignItems: "center", height: 38, justifyContent: "center", width: 38 },
   list: { marginVertical: 12 }, listContent: { gap: 8 },
-  babyRow: { alignItems: "center", backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 8, borderWidth: 1, flexDirection: "row", padding: 8 },
+  babyRow: { alignItems: "center", backgroundColor: "rgba(255,255,255,0.6)", borderColor: "rgba(255,255,255,0.9)", borderRadius: 12, borderWidth: 1, flexDirection: "row", padding: 8 },
   activeRow: { borderColor: colors.success }, babyMain: { alignItems: "center", flex: 1, flexDirection: "row", justifyContent: "space-between", paddingLeft: 6 },
   babyName: { color: colors.primaryDark, fontSize: 15, fontWeight: "800" }, babyMeta: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
   form: { borderTopColor: colors.border, borderTopWidth: 1, gap: 9, paddingTop: 14 },
-  input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 8, borderWidth: 1, color: colors.text, minHeight: 46, paddingHorizontal: 12 },
+  input: { backgroundColor: "rgba(255,255,255,0.75)", borderColor: colors.border, borderRadius: 12, borderWidth: 1, color: colors.text, minHeight: 46, paddingHorizontal: 12 },
   genderRow: { flexDirection: "row", gap: 6 }, gender: { alignItems: "center", backgroundColor: colors.surface, borderRadius: 6, flex: 1, paddingVertical: 10 },
   genderActive: { backgroundColor: colors.primary }, genderText: { color: colors.textMuted, fontSize: 12, fontWeight: "700" }, genderTextActive: { color: "#FFFFFF" },
   actions: { flexDirection: "row", gap: 8 }, cancel: { alignItems: "center", backgroundColor: colors.surface, borderRadius: 8, flex: 1, paddingVertical: 13 }, cancelText: { color: colors.text, fontWeight: "800" },

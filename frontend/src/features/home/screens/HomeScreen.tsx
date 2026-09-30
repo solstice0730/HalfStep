@@ -13,7 +13,7 @@ import {
   X,
   Zap
 } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -37,6 +37,9 @@ import {
   type PanGestureHandlerStateChangeEvent
 } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -50,7 +53,11 @@ import { getDiaryByDate } from "@/features/diary/services/diaryService";
 import { getTodayRecords } from "@/features/records/services/recordsService";
 import type { TodayRecords } from "@/features/records/types/records";
 import { askAiQuestion, fetchDailySummary, type AskResult, type DailySummaryResult } from "@/services/api/aiApi";
+import { GlassSurface } from "@/shared/components/GlassSurface";
+import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
+import { typography } from "@/shared/constants/typography";
 
 const todayIsoDate = () => new Date().toISOString().slice(0, 10);
 const todayDisplayDate = () =>
@@ -115,12 +122,32 @@ function BabyMascot() {
   );
 }
 
+function EntryButton({ icon, label, onPress }: { icon: ReactNode; label: string; onPress: () => void }) {
+  return (
+    <Pressable style={styles.entryButtonFlex} onPress={onPress}>
+      {({ pressed }) => (
+        <GlassSurface
+          radius={theme.radius.md}
+          intensity={24}
+          noShadow
+          style={pressed && styles.pressed}
+          contentStyle={styles.entryButtonContent}
+        >
+          {icon}
+          <Text style={styles.entryButtonText}>{label}</Text>
+        </GlassSurface>
+      )}
+    </Pressable>
+  );
+}
+
 type AsyncStatus = "idle" | "loading" | "success" | "error";
 
 export function HomeScreen({ navigation }: HomeScreenProps) {
   const { accessToken } = useAuth();
   const { activeBaby, error: babyError, isLoading: isBabyLoading, refresh: refreshBabies } = useBaby();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const pagerRef = useRef<ScrollView>(null);
   const cameraRef = useRef<CameraView>(null);
@@ -382,13 +409,17 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
       <View style={styles.homeRoot}>
         {quickOpen && <Pressable style={styles.quickDismissLayer} onPress={closeQuickLog} />}
         <View style={styles.header}>
-          <Pressable accessibilityRole="button" accessibilityLabel="아기 프로필 변경" style={styles.statusPill} onPress={() => setBabyMenuOpen(true)}>
-            <Text numberOfLines={1} style={styles.activeBabyName}>{activeBaby?.name ?? "아기"}</Text>
-            <ChevronDown color={colors.textMuted} size={18} />
+          <Pressable accessibilityRole="button" accessibilityLabel="아기 프로필 변경" onPress={() => setBabyMenuOpen(true)}>
+            <GlassSurface radius={theme.radius.pill} intensity={28} noShadow contentStyle={styles.statusPill}>
+              <Text numberOfLines={1} style={styles.activeBabyName}>{activeBaby?.name ?? "아기"}</Text>
+              <ChevronDown color={colors.textMuted} size={18} />
+            </GlassSurface>
           </Pressable>
           <View style={styles.headerActions}>
-            <Pressable accessibilityLabel="마이페이지 열기" accessibilityRole="button" onPress={openMyPage} style={styles.myPageButton}>
-              <User color={colors.primaryDark} size={19} />
+            <Pressable accessibilityLabel="마이페이지 열기" accessibilityRole="button" onPress={openMyPage}>
+              <GlassSurface radius={theme.radius.pill} intensity={28} noShadow contentStyle={styles.myPageButton}>
+                <User color={colors.primaryDark} size={19} />
+              </GlassSurface>
             </Pressable>
             <QuickLogMenu
               open={quickOpen}
@@ -417,28 +448,21 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         />
 
         <View style={styles.entryRow}>
-          <Pressable style={styles.entryButton} onPress={() => navigation.navigate("Records")}>
-            <BookOpen color={colors.primary} size={18} />
-            <Text style={styles.entryButtonText}>기록</Text>
-          </Pressable>
-          <Pressable style={styles.entryButton} onPress={() => navigation.navigate("Records")}>
-            <Sparkles color={colors.primary} size={18} />
-            <Text style={styles.entryButtonText}>AI 일기</Text>
-          </Pressable>
-          <Pressable style={styles.entryButton} onPress={() => navigation.navigate("Calendar")}>
-            <CalendarDays color={colors.primary} size={18} />
-            <Text style={styles.entryButtonText}>캘린더</Text>
-          </Pressable>
+          <EntryButton icon={<BookOpen color={colors.primary} size={18} />} label="기록" onPress={() => navigation.navigate("Records")} />
+          <EntryButton icon={<Sparkles color={colors.primary} size={18} />} label="AI 일기" onPress={() => navigation.navigate("Records")} />
+          <EntryButton icon={<CalendarDays color={colors.primary} size={18} />} label="캘린더" onPress={() => navigation.navigate("Calendar")} />
         </View>
 
-        <Pressable style={styles.questionBox} onPress={() => setChatOpen(true)}>
-          <Text style={styles.questionText}>아기가 전해줬으면 하는 말이 있나요?</Text>
-          <View style={styles.sendButton}>
-            <Send color="#FFFFFF" size={18} />
-          </View>
+        <Pressable onPress={() => setChatOpen(true)}>
+          <GlassSurface radius={theme.radius.xxl} intensity={30} contentStyle={styles.questionBox}>
+            <Text style={styles.questionText}>아기가 전해줬으면 하는 말이 있나요?</Text>
+            <LinearGradient colors={["#F2B6BF", colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.sendButton}>
+              <Send color="#FFFFFF" size={18} />
+            </LinearGradient>
+          </GlassSurface>
         </Pressable>
 
-        <View style={styles.curationCard}>
+        <GlassSurface radius={theme.radius.xl} intensity={32} contentStyle={styles.curationCard}>
           <View style={styles.curationHeader}>
             <Text style={styles.curationTitle}>{curation.title}</Text>
             <Sparkles color={colors.accent} size={18} />
@@ -449,13 +473,17 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
               <Text key={chip} numberOfLines={1} style={styles.chip}>#{chip}</Text>
             ))}
           </View>
-        </View>
+        </GlassSurface>
+
+        <View style={{ height: tabBarHeight }} />
       </View>
     </View>
   );
 
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
+    <View style={styles.root}>
+      <GradientBackdrop />
+      <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
       <ScrollView
         ref={pagerRef}
         horizontal
@@ -481,8 +509,10 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         >
           <Animated.View style={[styles.cameraRoot, { transform: [{ translateX: cameraTranslateX }] }]}>
             <View style={[styles.cameraTopOverlay, { paddingTop: insets.top + 12 }]}>
-              <Pressable style={styles.cameraControl} onPress={closeCamera}>
-                <X color="#FFFFFF" size={25} />
+              <Pressable onPress={closeCamera}>
+                <GlassSurface radius={theme.radius.pill} intensity={30} onDark noShadow contentStyle={styles.cameraControl}>
+                  <X color="#FFFFFF" size={25} />
+                </GlassSurface>
               </Pressable>
               <Text style={styles.cameraTitle}>오늘 사진 기록</Text>
               <View style={styles.cameraHeaderSpacer} />
@@ -500,16 +530,20 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                   <Camera color="#FFFFFF" size={52} />
                   <Text style={styles.permissionTitle}>카메라 권한이 필요해요</Text>
                   <Text style={styles.permissionText}>오늘의 순간을 사진으로 바로 기록할 수 있어요.</Text>
-                  <Pressable style={styles.permissionButton} onPress={requestPermission}>
-                    <Text style={styles.permissionButtonText}>권한 허용하기</Text>
+                  <Pressable onPress={requestPermission}>
+                    <LinearGradient colors={["#F2B6BF", colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.permissionButton}>
+                      <Text style={styles.permissionButtonText}>권한 허용하기</Text>
+                    </LinearGradient>
                   </Pressable>
                 </View>
               )}
               {!lastShot && permission?.granted && (
                 <View style={styles.cameraBottomDock}>
                   {facing === "back" ? (
-                    <Pressable style={styles.flashButton} onPress={() => setFlashOn((value) => !value)}>
-                      {flashOn ? <Zap color="#F5C842" size={22} /> : <Flashlight color="#FFFFFF" size={21} />}
+                    <Pressable onPress={() => setFlashOn((value) => !value)}>
+                      <GlassSurface radius={theme.radius.pill} intensity={30} onDark noShadow contentStyle={styles.flashButton}>
+                        {flashOn ? <Zap color="#F5C842" size={22} /> : <Flashlight color="#FFFFFF" size={21} />}
+                      </GlassSurface>
                     </Pressable>
                   ) : (
                     <View style={styles.flashButtonSpacer} />
@@ -517,24 +551,28 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                   <Pressable style={styles.shutterButton} onPress={takePhoto}>
                     <View style={styles.shutterInner} />
                   </Pressable>
-                  <Pressable style={styles.flipButton} onPress={() => setFacing((value) => (value === "back" ? "front" : "back"))}>
-                    <Camera color="#FFFFFF" size={23} />
+                  <Pressable onPress={() => setFacing((value) => (value === "back" ? "front" : "back"))}>
+                    <GlassSurface radius={theme.radius.pill} intensity={30} onDark noShadow contentStyle={styles.flipButton}>
+                      <Camera color="#FFFFFF" size={23} />
+                    </GlassSurface>
                   </Pressable>
                 </View>
               )}
               {lastShot && (
-                <View style={styles.recordPrompt}>
+                <GlassSurface radius={theme.radius.xxl} intensity={50} style={styles.recordPromptShell} contentStyle={styles.recordPrompt}>
                   <Text style={styles.recordPromptTitle}>이 사진을 일기에 올릴까요?</Text>
                   <Text style={styles.recordPromptText}>일기 작성 화면에 사진이 자동으로 추가돼요.</Text>
                   <View style={styles.recordPromptActions}>
                     <Pressable style={styles.retakeButton} onPress={() => setLastShot(null)}>
                       <Text style={styles.retakeButtonText}>다시 찍기</Text>
                     </Pressable>
-                    <Pressable style={styles.addRecordButton} onPress={addShotToRecord}>
-                      <Text style={styles.addRecordButtonText}>일기 쓰기</Text>
+                    <Pressable style={styles.addRecordButtonWrap} onPress={addShotToRecord}>
+                      <LinearGradient colors={["#F2B6BF", colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.addRecordButton}>
+                        <Text style={styles.addRecordButtonText}>일기 쓰기</Text>
+                      </LinearGradient>
                     </Pressable>
                   </View>
-                </View>
+                </GlassSurface>
               )}
             </View>
           </Animated.View>
@@ -550,14 +588,16 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
       </Modal>
 
       {currentPage === 1 && (
-        <Pressable style={styles.chatFloat} onPress={() => setChatOpen(true)}>
+        <Pressable style={[styles.chatFloat, { bottom: tabBarHeight + 14 }]} onPress={() => setChatOpen(true)}>
           <Image source={require("../../../../assets/images/chatbot-home.png")} resizeMode="contain" style={styles.chatFloatImage} />
         </Pressable>
       )}
 
       <Modal visible={quickSheet !== null} transparent animationType="slide" onRequestClose={() => setQuickSheet(null)}>
         <View style={styles.modalBackdrop}>
-          <View style={styles.sheet}>
+          <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
+          <GlassSurface radius={theme.radius.xxl} intensity={55} style={styles.sheetShell} contentStyle={styles.sheet}>
+            <View style={styles.sheetGrabber} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>약 기록</Text>
               <Pressable onPress={() => setQuickSheet(null)}>
@@ -578,16 +618,19 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
               value={medicineDose}
               onChangeText={setMedicineDose}
             />
-            <Pressable style={styles.writeDiaryButton} onPress={saveQuickSheet}>
-              <Text style={styles.writeDiaryButtonText}>저장하기</Text>
+            <Pressable onPress={saveQuickSheet}>
+              <LinearGradient colors={["#F2B6BF", colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.writeDiaryButton}>
+                <Text style={styles.writeDiaryButtonText}>저장하기</Text>
+              </LinearGradient>
             </Pressable>
-          </View>
+          </GlassSurface>
         </View>
       </Modal>
 
       <Modal visible={chatOpen} transparent animationType="fade" onRequestClose={() => setChatOpen(false)}>
         <View style={styles.modalBackdrop}>
-          <View style={styles.chatModal}>
+          <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
+          <GlassSurface radius={theme.radius.xxl} intensity={55} style={styles.chatModalShell} contentStyle={styles.chatModal}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>AI 육아 코치</Text>
               <Pressable onPress={() => setChatOpen(false)}>
@@ -652,17 +695,20 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
             )}
 
             <Text style={styles.subscriptionNote}>구독하면 기록 기반 개인화 답변과 주간 리포트를 받을 수 있어요.</Text>
-          </View>
+          </GlassSurface>
         </View>
       </Modal>
       <BabyProfileSheet visible={babyMenuOpen} onClose={() => setBabyMenuOpen(false)} />
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1
+  },
   safeArea: {
-    backgroundColor: colors.background,
     flex: 1
   },
   pager: {
@@ -695,19 +741,16 @@ const styles = StyleSheet.create({
   statusPill: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 4
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10
   },
   activeBabyName: {
     color: colors.primaryDark,
-    fontSize: 14,
-    fontWeight: "900"
+    ...typography.subheadEmphasized
   },
   myPageButton: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 999,
-    borderWidth: 1,
     height: 46,
     justifyContent: "center",
     width: 46
@@ -737,13 +780,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8
   },
-  entryButton: {
+  entryButtonFlex: {
+    flex: 1
+  },
+  pressed: {
+    opacity: 0.72
+  },
+  entryButtonContent: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    flex: 1,
     flexDirection: "row",
     gap: 6,
     justifyContent: "center",
@@ -751,13 +795,11 @@ const styles = StyleSheet.create({
   },
   entryButtonText: {
     color: colors.primaryDark,
-    fontSize: 12,
+    ...typography.caption1,
     fontWeight: "800"
   },
   questionBox: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 28,
     flexDirection: "row",
     gap: 12,
     minHeight: 52,
@@ -767,24 +809,16 @@ const styles = StyleSheet.create({
   questionText: {
     color: colors.textMuted,
     flex: 1,
-    fontSize: 15,
-    fontWeight: "700"
+    ...typography.subheadEmphasized
   },
   sendButton: {
     alignItems: "center",
-    backgroundColor: colors.accent,
-    borderRadius: 999,
+    borderRadius: theme.radius.pill,
     height: 34,
     justifyContent: "center",
     width: 34
   },
   curationCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderLeftColor: colors.accent,
-    borderLeftWidth: 4,
-    borderRadius: 22,
-    borderWidth: 1,
     padding: 13
   },
   curationHeader: {
@@ -795,12 +829,11 @@ const styles = StyleSheet.create({
   curationTitle: {
     color: colors.primaryDark,
     flex: 1,
-    fontSize: 15,
-    fontWeight: "900"
+    ...typography.subheadEmphasized
   },
   curationText: {
     color: colors.textMuted,
-    fontSize: 12,
+    ...typography.caption1,
     lineHeight: 18,
     marginTop: 7
   },
@@ -812,7 +845,7 @@ const styles = StyleSheet.create({
   },
   chip: {
     backgroundColor: colors.blueSoft,
-    borderRadius: 999,
+    borderRadius: theme.radius.pill,
     color: colors.primary,
     fontSize: 11,
     fontWeight: "800",
@@ -831,7 +864,6 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
     borderRadius: 999,
     borderWidth: 0,
-    bottom: 18,
     height: 58,
     justifyContent: "center",
     position: "absolute",
@@ -873,8 +905,6 @@ const styles = StyleSheet.create({
   },
   cameraControl: {
     alignItems: "center",
-    backgroundColor: "rgba(45,37,32,0.38)",
-    borderRadius: 999,
     height: 42,
     justifyContent: "center",
     width: 42
@@ -911,14 +941,14 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   permissionButton: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 999,
+    alignItems: "center",
+    borderRadius: theme.radius.pill,
     marginTop: 18,
     paddingHorizontal: 18,
     paddingVertical: 12
   },
   permissionButtonText: {
-    color: colors.primaryDark,
+    color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "900"
   },
@@ -939,10 +969,6 @@ const styles = StyleSheet.create({
   },
   flashButton: {
     alignItems: "center",
-    backgroundColor: "rgba(45,37,32,0.68)",
-    borderColor: "rgba(255,255,255,0.24)",
-    borderRadius: 999,
-    borderWidth: 1,
     height: 58,
     justifyContent: "center",
     width: 58
@@ -953,10 +979,6 @@ const styles = StyleSheet.create({
   },
   flipButton: {
     alignItems: "center",
-    backgroundColor: "rgba(45,37,32,0.68)",
-    borderColor: "rgba(255,255,255,0.24)",
-    borderRadius: 999,
-    borderWidth: 1,
     height: 58,
     justifyContent: "center",
     width: 58
@@ -971,15 +993,15 @@ const styles = StyleSheet.create({
     right: 34,
     zIndex: 5
   },
-  recordPrompt: {
-    backgroundColor: "rgba(255,255,255,0.94)",
-    borderRadius: 24,
+  recordPromptShell: {
     bottom: 28,
     left: 18,
-    padding: 16,
     position: "absolute",
     right: 18,
     zIndex: 5
+  },
+  recordPrompt: {
+    padding: 18
   },
   recordPromptTitle: {
     color: colors.primaryDark,
@@ -1011,11 +1033,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "900"
   },
+  addRecordButtonWrap: {
+    flex: 1
+  },
   addRecordButton: {
     alignItems: "center",
-    backgroundColor: colors.accent,
-    borderRadius: 999,
-    flex: 1,
+    borderRadius: theme.radius.pill,
     paddingVertical: 12
   },
   addRecordButtonText: {
@@ -1024,16 +1047,22 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   modalBackdrop: {
-    backgroundColor: "rgba(45,37,32,0.36)",
     flex: 1,
     justifyContent: "flex-end",
     padding: 16
   },
+  sheetShell: {},
+  sheetGrabber: {
+    alignSelf: "center",
+    backgroundColor: "rgba(47,41,38,0.22)",
+    borderRadius: theme.radius.pill,
+    height: 4,
+    marginBottom: 4,
+    width: 36
+  },
   sheet: {
-    backgroundColor: colors.background,
-    borderRadius: 28,
     gap: 14,
-    padding: 18
+    padding: 20
   },
   modalHeader: {
     alignItems: "center",
@@ -1054,7 +1083,7 @@ const styles = StyleSheet.create({
   sheetInput: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 16,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     color: colors.primaryDark,
     fontSize: 14,
@@ -1063,8 +1092,7 @@ const styles = StyleSheet.create({
   },
   writeDiaryButton: {
     alignItems: "center",
-    backgroundColor: colors.accent,
-    borderRadius: 18,
+    borderRadius: theme.radius.lg,
     padding: 14
   },
   writeDiaryButtonText: {
@@ -1072,12 +1100,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "900"
   },
+  chatModalShell: {},
   chatModal: {
     alignItems: "center",
-    backgroundColor: colors.background,
-    borderRadius: 28,
     gap: 14,
-    padding: 20
+    padding: 22
   },
   chatBotFace: {
     alignItems: "center",

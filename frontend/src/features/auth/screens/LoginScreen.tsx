@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
-import { Globe, MessageCircle, ShieldCheck } from "lucide-react-native";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Globe, MessageCircle } from "lucide-react-native";
 import * as WebBrowser from "expo-web-browser";
 
 import { env } from "@/config/env";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useOAuthProvider } from "@/features/auth/hooks/useOAuthProvider";
 import type { OAuthProvider } from "@/features/auth/types/auth";
+import { GlassSurface } from "@/shared/components/GlassSurface";
+import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
+import { typography } from "@/shared/constants/typography";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -46,15 +50,16 @@ const providers: ProviderOption[] = [
 export function LoginScreen() {
   return (
     <View style={styles.root}>
+      <GradientBackdrop />
       <View style={styles.header}>
         <View style={styles.mark}>
-          <ShieldCheck color="#FFFFFF" size={30} />
+          <Image source={require("../../../../assets/images/login-icon.jpg")} resizeMode="cover" style={styles.markImage} />
         </View>
         <Text style={styles.title}>HalfStep</Text>
         <Text style={styles.subtitle}>아이의 하루 기록을 안전하게 이어가세요.</Text>
       </View>
 
-      <View style={styles.panel}>
+      <GlassSurface radius={theme.radius.xxl} intensity={45} style={styles.panelShell} contentStyle={styles.panel}>
         <Text style={styles.panelTitle}>로그인</Text>
         <Text style={styles.panelText}>사용 중인 계정으로 인증하고 HalfStep 토큰을 발급받습니다.</Text>
 
@@ -65,7 +70,7 @@ export function LoginScreen() {
         </View>
 
         {__DEV__ && <DevLoginButton />}
-      </View>
+      </GlassSurface>
     </View>
   );
 }
@@ -195,7 +200,6 @@ function getProviderHelper(provider: OAuthProvider) {
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: colors.background,
     flex: 1,
     justifyContent: "center",
     padding: 22
@@ -205,69 +209,74 @@ const styles = StyleSheet.create({
     marginBottom: 34
   },
   mark: {
-    alignItems: "center",
-    backgroundColor: colors.primary,
     borderRadius: 24,
-    height: 64,
-    justifyContent: "center",
+    height: 88,
     marginBottom: 18,
-    width: 64
+    overflow: "hidden",
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    elevation: 4,
+    width: 88
+  },
+  markImage: {
+    height: "100%",
+    transform: [{ scale: 1.06 }],
+    width: "100%"
   },
   title: {
     color: colors.primaryDark,
-    fontSize: 34,
-    fontWeight: "900"
+    ...typography.largeTitle
   },
   subtitle: {
     color: colors.textMuted,
-    fontSize: 15,
-    fontWeight: "700",
-    lineHeight: 22,
+    ...typography.subheadEmphasized,
     marginTop: 8,
     textAlign: "center"
   },
-  panel: {
+  panelShell: {
     alignSelf: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 8,
-    borderWidth: 1,
     maxWidth: 720,
-    padding: 18,
     width: "100%"
+  },
+  panel: {
+    padding: 22
   },
   panelTitle: {
     color: colors.primaryDark,
-    fontSize: 21,
-    fontWeight: "900"
+    ...typography.title2
   },
   panelText: {
     color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
+    ...typography.subhead,
     marginTop: 8
   },
   buttonStack: {
     gap: 12,
-    marginTop: 18
+    marginTop: 20
   },
   oauthButton: {
     alignItems: "center",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: theme.radius.pill,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
     justifyContent: "center",
     minHeight: 52,
-    paddingHorizontal: 16
+    paddingHorizontal: 16,
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 1
   },
   disabledButton: {
     opacity: 0.55
   },
   oauthButtonText: {
-    fontSize: 15,
-    fontWeight: "900"
+    ...typography.headline
   },
   naverIcon: {
     fontSize: 19,
@@ -276,35 +285,32 @@ const styles = StyleSheet.create({
   },
   helperText: {
     color: colors.warning,
-    fontSize: 12,
+    ...typography.caption1,
     fontWeight: "700",
-    lineHeight: 18,
     marginTop: 8
   },
   errorText: {
     color: colors.danger,
-    fontSize: 12,
+    ...typography.caption1,
     fontWeight: "700",
-    lineHeight: 18,
     marginTop: 8
   },
   devLoginWrap: {
     borderColor: colors.border,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     marginTop: 18,
     paddingTop: 18
   },
   devButton: {
     alignItems: "center",
     backgroundColor: colors.surfaceSoft,
-    borderRadius: 8,
+    borderRadius: theme.radius.pill,
     justifyContent: "center",
     minHeight: 48,
     paddingHorizontal: 16
   },
   devButtonText: {
     color: colors.primaryDark,
-    fontSize: 13,
-    fontWeight: "800"
+    ...typography.subheadEmphasized
   }
 });

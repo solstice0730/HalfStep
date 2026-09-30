@@ -2,7 +2,7 @@ import { PropsWithChildren } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 
-import { colors } from "@/shared/constants/colors";
+import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
 import { spacing } from "@/shared/constants/spacing";
 
 interface ScreenProps {
@@ -11,17 +11,22 @@ interface ScreenProps {
 
 export function Screen({ children, edges }: PropsWithChildren<ScreenProps>) {
   return (
-    <SafeAreaView edges={edges} style={styles.safeArea}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.inner}>{children}</View>
-      </ScrollView>
-    </SafeAreaView>
+    <View style={styles.root}>
+      <GradientBackdrop />
+      <SafeAreaView edges={edges} style={styles.safeArea}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <View style={styles.inner}>{children}</View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1
+  },
   safeArea: {
-    backgroundColor: colors.background,
     flex: 1
   },
   content: {

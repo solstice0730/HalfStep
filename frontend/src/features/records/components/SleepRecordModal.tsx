@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { X } from "lucide-react-native";
+import { BlurView } from "expo-blur";
 
 import { TimePickerField, nowAsTimeValue, timeValueToMinutes, type TimeValue } from "@/features/records/components/TimePickerField";
+import { GlassSurface } from "@/shared/components/GlassSurface";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
 
 interface SleepRecordModalProps {
   visible: boolean;
@@ -31,7 +34,8 @@ export function SleepRecordModal({ visible, isSaving, onClose, onSave }: SleepRe
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+        <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
+        <GlassSurface radius={theme.radius.xxl} intensity={55} contentStyle={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>수면 기록</Text>
             <Pressable onPress={onClose}>
@@ -54,7 +58,7 @@ export function SleepRecordModal({ visible, isSaving, onClose, onSave }: SleepRe
               {isSaving ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.saveButtonText}>저장</Text>}
             </Pressable>
           </View>
-        </View>
+        </GlassSurface>
       </View>
     </Modal>
   );
@@ -62,14 +66,11 @@ export function SleepRecordModal({ visible, isSaving, onClose, onSave }: SleepRe
 
 const styles = StyleSheet.create({
   backdrop: {
-    backgroundColor: "rgba(45,37,32,0.36)",
     flex: 1,
     justifyContent: "flex-end",
     padding: 16
   },
   sheet: {
-    backgroundColor: colors.background,
-    borderRadius: 28,
     gap: 14,
     padding: 18
   },

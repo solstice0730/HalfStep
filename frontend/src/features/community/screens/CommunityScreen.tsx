@@ -1,11 +1,12 @@
 import type { CompositeScreenProps } from "@react-navigation/native";
 import { useFocusEffect } from "@react-navigation/native";
-import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import { useBottomTabBarHeight, type BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ImageIcon, PenLine } from "lucide-react-native";
 import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getPosts } from "@/features/community/services/communityService";
@@ -20,12 +21,15 @@ import {
 } from "@/features/community/types/community";
 import { EmptyState } from "@/shared/components/EmptyState";
 import { ErrorState } from "@/shared/components/ErrorState";
+import { GlassSurface } from "@/shared/components/GlassSurface";
 import { LoadingState } from "@/shared/components/LoadingState";
 import { Screen } from "@/shared/components/Screen";
 import type { AppStackParamList } from "@/navigation/AppStackNavigator";
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { ApiRequestError } from "@/services/api/apiClient";
 import { colors } from "@/shared/constants/colors";
+import { theme } from "@/shared/constants/theme";
+import { typography } from "@/shared/constants/typography";
 
 type CommunityScreenProps = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Community">,
@@ -45,6 +49,7 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const requestId = useRef(0);
+  const tabBarHeight = useBottomTabBarHeight();
 
   const loadFirstPage = useCallback(async () => {
     if (!accessToken) return;
@@ -91,9 +96,11 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
       <SafeAreaView edges={["top"]} style={styles.topSafeArea}>
         <View style={styles.topNav}>
           <Text style={styles.navTitle}>커뮤니티</Text>
-          <Pressable onPress={() => navigation.navigate("CommunityWrite")} style={styles.writeButton}>
-            <PenLine color="#FFFFFF" size={14} />
-            <Text style={styles.writeButtonText}>글쓰기</Text>
+          <Pressable onPress={() => navigation.navigate("CommunityWrite")}>
+            <LinearGradient colors={["#F2B6BF", colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.writeButton}>
+              <PenLine color="#FFFFFF" size={14} />
+              <Text style={styles.writeButtonText}>글쓰기</Text>
+            </LinearGradient>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -139,25 +146,25 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
         {status === "idle" && posts.length > 0 && (
           <View style={styles.list}>
             {posts.map((post) => (
-              <Pressable
-                key={post.id}
-                style={styles.postCard}
-                onPress={() => navigation.navigate("CommunityDetail", { postId: post.id })}
-              >
-                <View style={styles.postTop}>
-                  <Text style={styles.categoryPill}>{CATEGORY_LABELS[post.category]}</Text>
-                  <Text style={styles.metaText}>
-                    {post.babyAgeMonths != null ? `${post.babyAgeMonths}개월` : "월령 무관"}
-                  </Text>
-                </View>
-                <Text numberOfLines={1} style={styles.postTitle}>{post.title}</Text>
-                <Text numberOfLines={2} style={styles.postBody}>{post.preview}</Text>
-                <View style={styles.postBottom}>
-                  <Text style={styles.metaText}>
-                    {post.author.isAnonymous ? "익명" : post.author.nickname} · {formatDate(post.createdAt)}
-                  </Text>
-                  {post.imageCount > 0 && <ImageIcon color={colors.textMuted} size={14} />}
-                </View>
+              <Pressable key={post.id} onPress={() => navigation.navigate("CommunityDetail", { postId: post.id })}>
+                {({ pressed }) => (
+                  <GlassSurface radius={theme.radius.xl} intensity={30} style={pressed && styles.pressed} contentStyle={styles.postCard}>
+                    <View style={styles.postTop}>
+                      <Text style={styles.categoryPill}>{CATEGORY_LABELS[post.category]}</Text>
+                      <Text style={styles.metaText}>
+                        {post.babyAgeMonths != null ? `${post.babyAgeMonths}개월` : "월령 무관"}
+                      </Text>
+                    </View>
+                    <Text numberOfLines={1} style={styles.postTitle}>{post.title}</Text>
+                    <Text numberOfLines={2} style={styles.postBody}>{post.preview}</Text>
+                    <View style={styles.postBottom}>
+                      <Text style={styles.metaText}>
+                        {post.author.isAnonymous ? "익명" : post.author.nickname} · {formatDate(post.createdAt)}
+                      </Text>
+                      {post.imageCount > 0 && <ImageIcon color={colors.textMuted} size={14} />}
+                    </View>
+                  </GlassSurface>
+                )}
               </Pressable>
             ))}
 
@@ -168,6 +175,7 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
             )}
           </View>
         )}
+        <View style={{ height: tabBarHeight }} />
       </Screen>
     </View>
   );
@@ -175,16 +183,18 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: colors.background,
     flex: 1
   },
   topSafeArea: {
-    backgroundColor: colors.background
+    backgroundColor: colors.backgroundTop
+  },
+  pressed: {
+    opacity: 0.75
   },
   topNav: {
     alignItems: "center",
     borderBottomColor: colors.border,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     height: 56,
     justifyContent: "space-between",
@@ -192,12 +202,10 @@ const styles = StyleSheet.create({
   },
   navTitle: {
     color: colors.primaryDark,
-    fontSize: 17,
-    fontWeight: "900"
+    ...typography.headline
   },
   writeButton: {
     alignItems: "center",
-    backgroundColor: colors.accent,
     borderRadius: 999,
     flexDirection: "row",
     gap: 5,
@@ -214,7 +222,7 @@ const styles = StyleSheet.create({
     paddingBottom: 2
   },
   chip: {
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: "rgba(255,255,255,0.55)",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8
@@ -234,10 +242,6 @@ const styles = StyleSheet.create({
     gap: 12
   },
   postCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 22,
-    borderWidth: 1,
     padding: 16
   },
   postTop: {
