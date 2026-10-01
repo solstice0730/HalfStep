@@ -8,11 +8,15 @@
 - 아기 프로필 생성·조회·수정과 홈 요약
 - 수유·수면·소변·대변 기록과 사진 업로드
 - 기록 기반 AI 요약·질문과 육아 일지 생성·수정·저장
+- 홈에서 바로 저장하는 빠른 기록(수유·수면·소변·대변)과 기록 기반 맞춤 큐레이션
+- 월령·최근 7일 기록을 근거로 답하는 AI 육아코치 대화와 대화의 일기 재료 연결
+- 사진 장면 분석·대화·메모를 모아 만드는 AI 육아일기 초안과 검토 저장
 - 월간 캘린더와 날짜별 기록·일지 조회
-- 월령·주제 기반 커뮤니티 목록·상세·작성
+- 월령·주제 기반 커뮤니티 목록·상세·작성과 공감·저장·댓글
+- 최근 7일 패턴을 직전 주와 비교하는 주간 리포트
 - 7일 체험 후 월 8,900원 전면 유료 구독 목업
 
-가족방 생성·초대·채팅은 현재 MVP에서 제외했습니다. 댓글, 좋아요, 신고, 결제도 후속 범위입니다.
+가족방 생성·초대·채팅은 현재 MVP에서 제외했습니다. 신고와 결제는 후속 범위입니다.
 
 ## 기술 스택
 
@@ -94,10 +98,19 @@ pytest -q
 `71 passed, 2 skipped`이며 TypeScript, Expo 의존성 정합성, Web export를
 확인했습니다.
 
+## 업로드 정리
+
+일기 재료 화면은 사진을 고르는 즉시 업로드하므로 저장하지 않은 사진 파일이 남을 수 있습니다. 참조되지 않는 파일은 아래 스크립트로 정리합니다(cron 권장).
+
+```bash
+cd backend
+python scripts/cleanup_uploads.py --days 3 --dry-run
+```
+
 ## 환경 변수
 
 - 예시 파일: `backend/.env.example`, `frontend/.env.example`
-- 실제 `.env`, OAuth secret, OpenAI API key는 Git에 커밋하지 않습니다.
+- 실제 `.env`, OAuth secret, Gemini API key는 Git에 커밋하지 않습니다. AI 기능은 `backend/.env`의 `GEMINI_API_KEY`로 동작하며(모델 `GEMINI_MODEL`, 기본 `gemini-2.5-flash`), 키가 없으면 규칙 기반 fallback으로 동작합니다.
 - 운영 OAuth 값이 없을 때 프론트는 해당 제공자를 비활성화하고 설정 안내를 표시합니다.
 
 ## 남은 검증
@@ -113,6 +126,7 @@ pytest -q
 - [협업 컨벤션](docs/convention.md)
 - [브랜치 전략](docs/git-flow.md)
 - [기록 기능 PRD](docs/prd-records.md)
+- [소개 영상 핵심 플로우 설계](docs/superpowers/specs/2026-10-01-video-core-flow-design.md)
 
 ## 브랜치와 커밋
 

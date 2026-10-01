@@ -1,6 +1,6 @@
 // 아래 enum 값은 backend/app/schemas/records.py의 실제 계약과 동일하게 유지한다.
 // (feature/records-calendar 브랜치에서 가져온 records/calendar API 기준)
-export type FeedingType = "BREAST" | "FORMULA" | "MIXED";
+export type FeedingType = "BREAST" | "FORMULA" | "MIXED" | "SOLID";
 export type BreastSide = "LEFT" | "RIGHT" | "BOTH";
 export type SleepType = "NAP" | "NIGHT";
 export type SleepStatus = "PEACEFUL" | "RESTLESS" | "WOKE_OFTEN";
@@ -12,8 +12,12 @@ export type StoolForm = "WATERY" | "SOFT" | "NORMAL" | "HARD";
 export const FEEDING_TYPE_LABELS: Record<FeedingType, string> = {
   BREAST: "모유",
   FORMULA: "분유",
-  MIXED: "혼합"
+  MIXED: "혼합",
+  SOLID: "이유식"
 };
+
+// 빠른 기록 시트에 노출하는 수유 방식(소개 영상 기준). MIXED는 기존 기록 표시용으로만 유지한다.
+export const QUICK_FEEDING_TYPES: FeedingType[] = ["BREAST", "FORMULA", "SOLID"];
 
 export const DIAPER_AMOUNT_LABELS: Record<DiaperAmount, string> = {
   SMALL: "적음",
@@ -99,6 +103,8 @@ export interface DiaryGenerationRequest {
   };
   photoDescriptions: string[];
   memo?: string;
+  // AI 육아코치 대화 중 "오늘 일기에 추가"한 항목 (diary_materials source=CHAT).
+  conversations: string[];
 }
 
 // Mirrors backend app/schemas/ai.py DiaryGenerateResponse exactly.

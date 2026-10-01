@@ -49,7 +49,7 @@ export function BabySetupScreen() {
           <View>
             <Text style={styles.eyebrow}>첫 설정</Text>
             <Text style={styles.title}>아기 정보를 등록해 주세요</Text>
-            <Text style={styles.description}>기록과 AI 일지는 등록한 아기를 기준으로 저장됩니다.</Text>
+            <Text style={styles.description}>기록과 일기는 등록한 아기를 기준으로 저장됩니다.</Text>
           </View>
 
           <GlassSurface radius={theme.radius.xl} intensity={34} contentStyle={styles.form}>

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 class FeedingRecordCreate(BaseModel):
     babyId: int = Field(gt=0)
     occurredAt: datetime
-    feedingType: Literal["BREAST", "FORMULA", "MIXED"]
+    feedingType: Literal["BREAST", "FORMULA", "MIXED", "SOLID"]
     amountMl: int | None = Field(default=None, gt=0, le=500)
     durationMinutes: int | None = Field(default=None, gt=0, le=180)
     breastSide: Literal["LEFT", "RIGHT", "BOTH"] | None = None

@@ -219,7 +219,7 @@ class CalendarApiTest(unittest.TestCase):
         )
         self.assertEqual(
             data["daySummary"],
-            {"feedingCount": 1, "sleepTotalMinutes": 90, "urineCount": 1, "stoolCount": 1},
+            {"feedingCount": 1, "sleepTotalMinutes": 90, "urineCount": 1, "stoolCount": 1, "photoCount": 0, "chatCount": 0},
         )
 
     def test_daily_timeline_uses_korean_day_boundary_and_empty_state(self) -> None:
@@ -238,7 +238,7 @@ class CalendarApiTest(unittest.TestCase):
         self.assertEqual(previous.json()["data"]["timeline"], [])
         self.assertEqual(
             previous.json()["data"]["daySummary"],
-            {"feedingCount": 0, "sleepTotalMinutes": 0, "urineCount": 0, "stoolCount": 0},
+            {"feedingCount": 0, "sleepTotalMinutes": 0, "urineCount": 0, "stoolCount": 0, "photoCount": 0, "chatCount": 0},
         )
         self.assertEqual(len(selected.json()["data"]["timeline"]), 1)
         self.assertEqual(selected.json()["data"]["timeline"][0]["time"], "2026-07-16T00:30:00+09:00")

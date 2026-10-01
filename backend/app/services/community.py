@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.community import CommunityPost
+from app.models.community_comment import CommunityComment
 from app.models.user import User
 from app.repositories import community_repository
 from app.schemas.community import CommunityPostCreate
@@ -89,13 +90,62 @@ def serialize_author(post: CommunityPost, *, include_user_id: bool = False) -> d
     }
 
 
-def serialize_list_item(post: CommunityPost) -> dict:
+def serialize_list_item(
+    post: CommunityPost,
+    *,
+    like_count: int = 0,
+    is_liked: bool = False,
+    is_bookmarked: bool = False,
+    comment_count: int = 0,
+) -> dict:
     preview = post.content[:100] + ("..." if len(post.content) > 100 else "")
     return {
         "id": str(post.id), "category": post.category.code, "title": post.title,
-        "preview": preview, "author": serialize_author(post), "likeCount": 0,
-        "babyAgeMonths": post.baby_age_months, "commentCount": 0,
+        "preview": preview, "author": serialize_author(post), "likeCount": like_count,
+        "isLiked": is_liked, "isBookmarked": is_bookmarked,
+        "babyAgeMonths": post.baby_age_months, "commentCount": comment_count,
         "imageCount": len(post.image_urls or []), "createdAt": post.created_at,
+    }
+
+
+REACTION_TYPES = {"LIKE", "BOOKMARK"}
+
+
+def reaction_state(db: Session, *, posts: list[CommunityPost], user_id: int) -> dict[int, dict]:
+    """게시글 목록에 대한 공감 수와 현재 사용자의 공감·저장 여부를 한 번에 조회한다."""
+    post_ids = [post.id for post in posts]
+    like_counts = community_repository.count_reactions(db, post_ids=post_ids, reaction_type="LIKE")
+    comment_counts = community_repository.count_comments(db, post_ids=post_ids)
+    mine = community_repository.user_reactions(db, post_ids=post_ids, user_id=user_id)
+    return {
+        post.id: {
+            "like_count": like_counts.get(post.id, 0),
+            "is_liked": (post.id, "LIKE") in mine,
+            "is_bookmarked": (post.id, "BOOKMARK") in mine,
+            "comment_count": comment_counts.get(post.id, 0),
+        }
+        for post in posts
+    }
+
+
+def set_reaction(
+    db: Session, *, post_id: int, user_id: int, reaction_type: str, active: bool
+) -> dict:
+    """공감·저장을 켜거나 끈다. 이미 같은 상태면 그대로 두어 멱등하게 동작한다."""
+    if reaction_type not in REACTION_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid reaction type.")
+    get_community_post(db, post_id)
+    existing = community_repository.get_reaction(db, post_id=post_id, user_id=user_id, reaction_type=reaction_type)
+    if active and existing is None:
+        community_repository.add_reaction(db, post_id=post_id, user_id=user_id, reaction_type=reaction_type)
+    elif not active and existing is not None:
+        community_repository.remove_reaction(db, existing)
+    db.commit()
+    state = reaction_state(db, posts=[get_community_post(db, post_id)], user_id=user_id)[post_id]
+    return {
+        "likeCount": state["like_count"],
+        "isLiked": state["is_liked"],
+        "isBookmarked": state["is_bookmarked"],
     }
 
 
@@ -113,3 +163,45 @@ def _decode_cursor(cursor: str) -> int:
         return int(raw_id)
     except (ValueError, UnicodeDecodeError, binascii.Error) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid cursor.") from exc
+
+
+def list_comments(db: Session, *, post_id: int, user_id: int) -> list[dict]:
+    get_community_post(db, post_id)
+    comments = community_repository.list_comments(db, post_id=post_id)
+    return [serialize_comment(comment, user_id=user_id) for comment in comments]
+
+
+def add_comment(db: Session, *, post_id: int, user: User, content: str, is_anonymous: bool) -> dict:
+    get_community_post(db, post_id)
+    comment = community_repository.create_comment(
+        db, post_id=post_id, user_id=user.id, content=content, is_anonymous=is_anonymous
+    )
+    db.commit()
+    db.refresh(comment)
+    return serialize_comment(comment, user_id=user.id)
+
+
+def remove_comment(db: Session, *, post_id: int, comment_id: int, user_id: int) -> None:
+    comment = community_repository.get_comment(db, comment_id)
+    if comment is None or comment.post_id != post_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found.")
+    if comment.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the author can delete this comment.")
+    community_repository.delete_comment(db, comment)
+    db.commit()
+
+
+def serialize_comment(comment: CommunityComment, *, user_id: int) -> dict:
+    anonymous = comment.is_anonymous
+    return {
+        "id": str(comment.id),
+        "postId": str(comment.post_id),
+        "content": comment.content,
+        "author": {
+            "userId": None if anonymous else str(comment.user_id),
+            "nickname": "익명" if anonymous else (comment.author.nickname or "사용자"),
+            "isAnonymous": anonymous,
+        },
+        "isMine": comment.user_id == user_id,
+        "createdAt": comment.created_at,
+    }

@@ -8,7 +8,7 @@ app.dependency_overrides[get_current_user] = lambda: object()
 
 
 def test_diary_generate_endpoint_returns_wrapped_response(monkeypatch):
-    monkeypatch.setattr(ai_service, "_get_openai_client", lambda: None)
+    monkeypatch.setattr(ai_service, "_get_llm_client", lambda: None)
 
     response = client.post(
         "/api/ai/diary/generate",

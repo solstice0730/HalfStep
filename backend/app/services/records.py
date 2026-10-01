@@ -68,6 +68,7 @@ def current_date() -> date:
 def summarize_logs(logs: list[CareLog]) -> dict:
     summary = {
         "feedingCount": 0,
+        "sleepCount": 0,
         "sleepTotalMinutes": 0,
         "urineCount": 0,
         "stoolCount": 0,
@@ -80,6 +81,7 @@ def summarize_logs(logs: list[CareLog]) -> dict:
             if summary["lastFeedingAt"] is None or log.occurred_at > summary["lastFeedingAt"]:
                 summary["lastFeedingAt"] = log.occurred_at
         elif log.log_type == "SLEEP":
+            summary["sleepCount"] += 1
             if log.started_at is not None and log.ended_at is not None:
                 summary["sleepTotalMinutes"] += max(
                     0, round((log.ended_at - log.started_at).total_seconds() / 60)

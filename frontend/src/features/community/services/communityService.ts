@@ -1,10 +1,12 @@
 import { apiRequest } from "@/services/api/apiClient";
 import type {
+  CommunityComment,
   CommunityPostDetail,
   CommunityPostListItem,
   CreatePostInput,
   GetPostsParams,
-  GetPostsResult
+  GetPostsResult,
+  ReactionState
 } from "@/features/community/types/community";
 
 const DEFAULT_LIMIT = 5;
@@ -30,4 +32,35 @@ export async function createPost(accessToken: string, input: CreatePostInput): P
     body: input
   });
   return { id: data.id };
+}
+
+export async function getComments(accessToken: string, postId: string): Promise<CommunityComment[]> {
+  const { data } = await apiRequest<CommunityComment[]>(`/posts/${postId}/comments`, { accessToken });
+  return data;
+}
+
+export async function addComment(
+  accessToken: string,
+  postId: string,
+  input: { content: string; isAnonymous: boolean }
+): Promise<CommunityComment> {
+  const { data } = await apiRequest<CommunityComment>(`/posts/${postId}/comments`, { method: "POST", accessToken, body: input });
+  return data;
+}
+
+export async function deleteComment(accessToken: string, postId: string, commentId: string): Promise<void> {
+  await apiRequest<null>(`/posts/${postId}/comments/${commentId}`, { method: "DELETE", accessToken });
+}
+
+export async function setPostReaction(
+  accessToken: string,
+  postId: string,
+  reaction: "like" | "bookmark",
+  active: boolean
+): Promise<ReactionState> {
+  const { data } = await apiRequest<ReactionState>(`/posts/${postId}/${reaction}`, {
+    method: active ? "POST" : "DELETE",
+    accessToken
+  });
+  return data;
 }

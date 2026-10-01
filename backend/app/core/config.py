@@ -25,9 +25,15 @@ class Settings(BaseSettings):
     NAVER_CLIENT_ID: str = ""
     NAVER_CLIENT_SECRET: str = ""
 
+    # LLM 공급자: auto | gemini | openai | none (auto는 설정된 키 기준 Gemini 우선)
+    AI_PROVIDER: str = "auto"
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
     OPENAI_API_KEY: str = ""
-    AI_MODEL: str = "gpt-4o-mini"
+    AI_MODEL: str = "gpt-4o-mini"  # OpenAI 모델명 (호환용)
     AI_FALLBACK_ENABLED: bool = True
+    # 일기 생성은 모델 실패 시 조용히 규칙 기반으로 바꾸지 않고 503으로 알려 재시도를 유도한다.
+    AI_DIARY_FALLBACK_ON_ERROR: bool = False
 
     UPLOAD_DIR: str = "/app/uploads"
 

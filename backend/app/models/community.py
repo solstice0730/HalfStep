@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -38,6 +38,21 @@ class CommunityPost(Base):
 
     category: Mapped[CommunityCategory] = relationship(back_populates="posts")
     author: Mapped["User"] = relationship()
+
+
+class CommunityPostReaction(Base):
+    """게시글 공감(LIKE)·저장(BOOKMARK). 사용자당 게시글·종류별 1개."""
+
+    __tablename__ = "community_post_reactions"
+    __table_args__ = (
+        UniqueConstraint("post_id", "user_id", "reaction_type", name="uq_post_reaction"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey("community_posts.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    reaction_type: Mapped[str] = mapped_column(String(20), index=True)  # LIKE | BOOKMARK
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 from app.models.user import User  # noqa: E402

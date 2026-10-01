@@ -2109,3 +2109,40 @@ POST /files/presigned-url
 *— 문서 끝 —*
 
 > 기밀 — 내부 배포 한정
+
+
+---
+
+## 14. 소개 영상 핵심 플로우 확장 (2026-10)
+
+구현 기준 추가 API. 상세 설계는 `docs/superpowers/specs/2026-10-01-video-core-flow-design.md`.
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| GET | `/home/dashboard` | `todaySummary.feedingTotalMl·lastFeedingIntervalMinutes·photoCount·diarySaved`, `curation{headline,text,chips,basis}` 추가 |
+| POST | `/ai/ask` | 응답에 `evidence[]`, `suggestDiaryLink`, `context{ageDays, todayFeedingCount, todayFeedingTotalMl, weeklyAvgDailyMl, avgIntervalMinutes, …}` 추가 |
+| POST | `/ai/diary/generate` | 요청에 `conversations: string[]` 추가 |
+| POST | `/ai/photos/analyze` | `{photoUrls[]}` → `{items[{url, caption, source}]}` (Gemini 키 없으면 `caption: null`) |
+| POST | `/diary/materials` | `{babyId, date, source: CHAT\|MEMO, content}` → 일기 재료 저장 |
+| GET | `/diary/materials?babyId&date` | `{items[], counts{chat, memo}}` |
+| DELETE | `/diary/materials/{id}` | 재료 삭제 |
+| GET | `/calendar/daily` | `daySummary.photoCount`, `daySummary.chatCount` 추가 |
+| POST/DELETE | `/posts/{id}/like` | 공감 토글 → `{likeCount, isLiked, isBookmarked}` |
+| POST/DELETE | `/posts/{id}/bookmark` | 저장 토글 → 동일 응답 |
+| GET | `/reports/weekly?babyId&endDate` | 주간 리포트: `period, baby, insight, feeding{daily[], totalMl, prevTotalMl, changePercent, …}, sleep, diaper, curations[], nextWeekFocus[]` |
+
+`POST /records/feeding`의 `feedingType`에 `SOLID`(이유식)가 추가됐다.
+
+### 14.1 보완 작업 추가분
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| POST | `/auth/refresh` | `{refreshToken}` → 새 `accessToken`·`refreshToken`(1회용 회전). 만료·재사용 시 401 |
+| PUT | `/diary/materials/memo` | `{babyId, date, content}` 보호자 메모 upsert(날짜당 1개). 빈 내용이면 삭제, `data: null` |
+| GET | `/posts/{id}/comments` | 댓글 목록 `[{id, postId, content, author, isMine, createdAt}]` |
+| POST | `/posts/{id}/comments` | `{content, isAnonymous}` → 201 댓글. 목록·상세의 `commentCount`에 반영 |
+| DELETE | `/posts/{id}/comments/{commentId}` | 작성자만 삭제(타인 403) |
+| POST | `/ai/diary/generate` | 재료가 2개 미만이면 모델 호출 없이 규칙 기반 초안. 모델 실패 시 `503 {"detail": "AI가 잠시 바빠요…"}` (`AI_DIARY_FALLBACK_ON_ERROR=true`면 규칙 기반 fallback) |
+| GET | `/reports/weekly` | `insight`는 규칙 기반 초안을 Gemini가 문장만 다듬은 결과(모델 없으면 초안 그대로) |
+
+프론트 `apiClient`는 401을 받으면 `/auth/refresh`로 한 번 갱신해 재시도하고, 그래도 401이면 로그아웃한다.

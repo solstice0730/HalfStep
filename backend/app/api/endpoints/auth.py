@@ -17,7 +17,13 @@ from app.repositories.user_repository import (
     get_user_by_social_identity,
     update_refresh_token,
 )
-from app.schemas.auth import LogoutRequest, SocialCodeLoginRequest, SocialLoginRequest, SocialLoginResponse
+from app.schemas.auth import (
+    LogoutRequest,
+    RefreshRequest,
+    SocialCodeLoginRequest,
+    SocialLoginRequest,
+    SocialLoginResponse,
+)
 from app.services.oauth import exchange_oauth_code_for_profile, verify_oauth_access_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -88,6 +94,11 @@ def _issue_session(profile, db: Session) -> dict:
             profile_image_url=profile.profile_image_url,
         )
 
+    return {"success": True, "data": _rotate_tokens(user, db, is_new_user=is_new_user).model_dump()}
+
+
+def _rotate_tokens(user: User, db: Session, *, is_new_user: bool) -> SocialLoginResponse:
+    """새 refresh token을 발급해 저장하고(기존 토큰은 무효화) 세션 응답을 만든다."""
     refresh_token = create_refresh_token()
     refresh_token_expires_at = datetime.now(timezone.utc) + timedelta(
         days=settings.REFRESH_TOKEN_EXPIRE_DAYS
@@ -101,7 +112,7 @@ def _issue_session(profile, db: Session) -> dict:
     db.commit()
     db.refresh(user)
 
-    response = SocialLoginResponse(
+    return SocialLoginResponse(
         accessToken=create_access_token(str(user.id)),
         refreshToken=refresh_token,
         isNewUser=is_new_user,
@@ -112,7 +123,19 @@ def _issue_session(profile, db: Session) -> dict:
             "provider": user.social_provider,
         },
     )
-    return {"success": True, "data": response.model_dump()}
+
+
+@router.post("/refresh", status_code=status.HTTP_200_OK)
+def refresh_session(payload: RefreshRequest, db: Session = Depends(get_db)) -> dict:
+    """만료된 access token을 refresh token으로 갱신한다. refresh token은 1회용으로 회전한다."""
+    user = get_user_by_refresh_token_hash(db, refresh_token_hash=hash_token(payload.refreshToken))
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token.")
+    if _is_refresh_token_expired(user.refresh_token_expires_at):
+        update_refresh_token(db, user=user, refresh_token_hash=None, refresh_token_expires_at=None)
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token has expired.")
+    return {"success": True, "data": _rotate_tokens(user, db, is_new_user=False).model_dump()}
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)

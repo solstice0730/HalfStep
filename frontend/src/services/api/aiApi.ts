@@ -1,8 +1,10 @@
 import { env } from "@/config/env";
-import { notifyAuthFailure } from "@/services/api/apiClient";
+import { fetchWithAuth, readErrorDetail } from "@/services/api/apiClient";
 import type { DiaryGenerationRequest, DiaryGenerationResponse } from "@/features/records/types/records";
 
-export type AiErrorKind = "network" | "auth" | "validation" | "server" | "timeout" | "malformed";
+export type AiErrorKind = "network" | "auth" | "validation" | "server" | "timeout" | "malformed" | "unavailable";
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
 
 export class AiRequestError extends Error {
   kind: AiErrorKind;
@@ -21,11 +23,31 @@ export type DailySummaryResult = {
   recordCount: number;
 };
 
+export type AskContext = {
+  ageDays: number;
+  ageMonths: number;
+  todayFeedingCount: number;
+  todayFeedingTotalMl: number;
+  todaySleepMinutes: number;
+  todayDiaperCount: number;
+  weeklyAvgDailyMl: number | null;
+  avgIntervalMinutes: number | null;
+};
+
 export type AskResult = {
   answer: string;
   safetyNotice: string;
   isMedicalRestricted: boolean;
   source: "ai" | "fallback" | "restricted" | "no_data";
+  evidence: string[];
+  suggestDiaryLink: boolean;
+  context: AskContext | null;
+};
+
+export type PhotoCaption = {
+  url: string;
+  caption: string | null;
+  source: "ai" | "fallback";
 };
 
 type ApiEnvelope<T> = {
@@ -38,16 +60,12 @@ export async function fetchDailySummary(
   babyId: number,
   date: string
 ): Promise<DailySummaryResult> {
-  const response = await fetch(`${env.apiBaseUrl}/ai/daily-summary`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ babyId, date })
-  });
+  const response = await fetchWithAuth(
+    `${env.apiBaseUrl}/ai/daily-summary`,
+    { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ babyId, date }) },
+    accessToken
+  );
 
-  if (response.status === 401) notifyAuthFailure();
   if (!response.ok) {
     throw new Error("하루 요약을 불러오지 못했습니다.");
   }
@@ -62,22 +80,34 @@ export async function askAiQuestion(
   date: string,
   question: string
 ): Promise<AskResult> {
-  const response = await fetch(`${env.apiBaseUrl}/ai/ask`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ babyId, date, question })
-  });
+  const response = await fetchWithAuth(
+    `${env.apiBaseUrl}/ai/ask`,
+    { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ babyId, date, question }) },
+    accessToken
+  );
 
-  if (response.status === 401) notifyAuthFailure();
   if (!response.ok) {
     throw new Error("답변을 가져오지 못했습니다.");
   }
 
   const payload = (await response.json()) as ApiEnvelope<AskResult>;
   return payload.data;
+}
+
+// 사진 장면 분석. 실패해도 일기 생성은 막지 않으므로 호출부에서 조용히 무시할 수 있게 캡션만 돌려준다.
+export async function analyzePhotos(accessToken: string, photoUrls: string[]): Promise<PhotoCaption[]> {
+  const response = await fetchWithAuth(
+    `${env.apiBaseUrl}/ai/photos/analyze`,
+    { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ photoUrls }) },
+    accessToken
+  );
+
+  if (!response.ok) {
+    throw new Error("사진을 분석하지 못했습니다.");
+  }
+
+  const payload = (await response.json()) as ApiEnvelope<{ items: PhotoCaption[] }>;
+  return payload.data.items;
 }
 
 const DIARY_GENERATE_TIMEOUT_MS = 20000;
@@ -91,15 +121,11 @@ export async function generateDiary(
 
   let response: Response;
   try {
-    response = await fetch(`${env.apiBaseUrl}/ai/diary/generate`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(request),
-      signal: controller.signal
-    });
+    response = await fetchWithAuth(
+      `${env.apiBaseUrl}/ai/diary/generate`,
+      { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(request), signal: controller.signal },
+      accessToken
+    );
   } catch {
     if (controller.signal.aborted) {
       throw new AiRequestError("timeout", "요청 시간이 초과되었습니다.");
@@ -110,14 +136,16 @@ export async function generateDiary(
   }
 
   if (response.status === 401) {
-    notifyAuthFailure();
     throw new AiRequestError("auth", "인증이 만료되었습니다.");
+  }
+  if (response.status === 503) {
+    throw new AiRequestError("unavailable", (await readErrorDetail(response)) ?? "일기 작성이 잠시 지연되고 있어요. 몇 초 뒤 다시 시도해 주세요.");
   }
   if (response.status === 422) {
     throw new AiRequestError("validation", "입력값을 확인해 주세요.");
   }
   if (response.status === 500 || response.status === 502) {
-    throw new AiRequestError("server", "AI 서비스에 문제가 발생했습니다.");
+    throw new AiRequestError("server", "일기 작성 서비스에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.");
   }
   if (!response.ok) {
     throw new AiRequestError("server", "육아일기를 생성하지 못했습니다.");

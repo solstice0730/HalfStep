@@ -132,11 +132,16 @@ class RecordsApiTest(unittest.TestCase):
             response.json()["data"]["todaySummary"],
             {
                 "feedingCount": 1,
+                "sleepCount": 1,
                 "sleepTotalMinutes": 90,
                 "urineCount": 1,
                 "stoolCount": 1,
                 "lastFeedingAt": f"{today}T09:00:00+09:00",
                 "lastSleepAt": f"{today}T11:30:00+09:00",
+                "feedingTotalMl": 120,
+                "lastFeedingIntervalMinutes": None,
+                "photoCount": 0,
+                "diarySaved": False,
             },
         )
 

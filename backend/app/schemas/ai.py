@@ -28,11 +28,25 @@ class AskRequest(BaseModel):
     question: str = Field(min_length=1)
 
 
+class AskContext(BaseModel):
+    ageDays: int
+    ageMonths: int
+    todayFeedingCount: int
+    todayFeedingTotalMl: int
+    todaySleepMinutes: int
+    todayDiaperCount: int
+    weeklyAvgDailyMl: int | None
+    avgIntervalMinutes: int | None
+
+
 class AskResponse(BaseModel):
     answer: str
     safetyNotice: str
     isMedicalRestricted: bool
     source: str  # "ai" | "fallback" | "restricted" | "no_data"
+    evidence: list[str] = Field(default_factory=list)
+    suggestDiaryLink: bool = False
+    context: AskContext | None = None
 
 
 class BabyInfo(BaseModel):
@@ -74,6 +88,8 @@ class DiaryGenerateRequest(BaseModel):
     records: DiaryRecords = Field(default_factory=DiaryRecords)
     photoDescriptions: list[str] = Field(default_factory=list)
     memo: str | None = None
+    # AI 육아코치와 나눈 대화 중 보호자가 "오늘 일기에 추가"한 항목. 참고 정보로만 사용한다.
+    conversations: list[str] = Field(default_factory=list, max_length=20)
 
 
 class DiaryGenerateResponse(BaseModel):
@@ -82,3 +98,17 @@ class DiaryGenerateResponse(BaseModel):
     highlights: list[str]
     generatedByAi: bool
     notice: str
+
+
+class PhotoAnalyzeRequest(BaseModel):
+    photoUrls: list[str] = Field(min_length=1, max_length=5)
+
+
+class PhotoCaption(BaseModel):
+    url: str
+    caption: str | None
+    source: str  # "ai" | "fallback"
+
+
+class PhotoAnalyzeResponse(BaseModel):
+    items: list[PhotoCaption]

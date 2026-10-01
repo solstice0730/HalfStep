@@ -7,7 +7,7 @@ from app.core.time import day_bounds, month_bounds, to_app_timezone
 from app.models.diary import Diary
 from app.models.records import CareLog
 from app.models.user import User
-from app.repositories import calendar_repository
+from app.repositories import calendar_repository, diary_material_repository
 from app.services.diary_service import get_diary_by_date_service
 from app.services.records import require_baby_access
 
@@ -94,6 +94,10 @@ def get_day(db: Session, *, user: User, baby_id: int, target_date: date) -> dict
         "sleepTotalMinutes": 0,
         "urineCount": 0,
         "stoolCount": 0,
+        "photoCount": len(diary.imageUrls) if diary is not None else 0,
+        "chatCount": diary_material_repository.count_materials(
+            db, baby_id=baby_id, material_date=target_date, source="CHAT"
+        ),
     }
     timeline = []
     for log in logs:
@@ -140,6 +144,8 @@ def _record_summary(log: CareLog) -> str:
             return f"분유 {log.amount_ml or 0}ml"
         if log.feeding_type == "MIXED":
             return "혼합 수유"
+        if log.feeding_type == "SOLID":
+            return f"이유식 {log.amount_ml or 0}ml"
         return f"모유 {content.get('durationMinutes') or 0}분"
     if log.log_type == "SLEEP":
         minutes = _sleep_minutes(log)

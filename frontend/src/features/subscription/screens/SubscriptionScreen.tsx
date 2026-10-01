@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Crown, Sparkles } from "lucide-react-native";
+import { ArrowLeft, Check, Crown } from "lucide-react-native";
 import { ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -22,9 +22,9 @@ const HYPOTHETICAL_PRICE = "월 8,900원";
 const comparisonRows: PlanComparisonRow[] = [
   { feature: "기록 (수유·수면·배변·이유식·체온·키/몸무게, 캘린더 조회)" },
   { feature: "육아 커뮤니티 (정보 공유, 질문·답변 게시판)" },
-  { feature: "AI 하루 요약", quotaPending: true },
-  { feature: "AI 육아일기 초안 (사진 설명 + 기록 기반)", quotaPending: true },
-  { feature: "AI 질문", quotaPending: true }
+  { feature: "오늘 하루 요약", quotaPending: true },
+  { feature: "오늘의 일기 초안 (사진 + 기록 기반)", quotaPending: true },
+  { feature: "육아코치에게 질문", quotaPending: true }
 ];
 
 export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
@@ -87,15 +87,15 @@ export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
             </View>
           ))}
         </GlassSurface>
-        <Text style={styles.quotaFootnote}>* AI 기능의 월 사용량·과금 정책은 아직 확정되지 않았어요.</Text>
+        <Text style={styles.quotaFootnote}>* 일기·코치 기능의 월 사용량·과금 정책은 아직 확정되지 않았어요.</Text>
 
         <GlassSurface radius={theme.radius.xl} intensity={30} noShadow contentStyle={styles.valueCard}>
           <View style={styles.valueHeader}>
-            <Sparkles color={colors.primary} size={16} />
+            <Crown color={colors.primary} size={16} />
             <Text style={styles.valueTitle}>구독으로 계속 이용하는 것</Text>
           </View>
           <Text style={styles.valueText}>
-            사진 설명과 기록을 바탕으로 AI가 하루 요약과 육아일기 초안을 만들어 드려요. 육아가 궁금할 땐 AI에게 물어볼 수
+            사진과 기록을 바탕으로 하루 요약과 오늘의 일기 초안을 만들어 드려요. 육아가 궁금할 땐 육아코치에게 물어볼 수
             있고, 다른 부모들과 커뮤니티에서 정보를 나눌 수 있어요. 이 기능들은 7일 체험 후에는 구독을 통해서만 계속
             이용할 수 있어요.
           </Text>

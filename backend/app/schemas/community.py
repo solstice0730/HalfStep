@@ -36,6 +36,8 @@ class CommunityPostListItem(BaseModel):
     babyAgeMonths: int | None
     author: CommunityAuthor
     likeCount: int = 0
+    isLiked: bool = False
+    isBookmarked: bool = False
     commentCount: int = 0
     imageCount: int
     createdAt: datetime
@@ -44,8 +46,13 @@ class CommunityPostListItem(BaseModel):
 class CommunityPostDetail(CommunityPostListItem):
     content: str
     imageUrls: list[str]
-    isLiked: bool = False
     updatedAt: datetime
+
+
+class ReactionState(BaseModel):
+    likeCount: int
+    isLiked: bool
+    isBookmarked: bool
 
 
 class SimilarPost(BaseModel):
@@ -57,3 +64,25 @@ class SimilarPost(BaseModel):
 class CommunityPostCreated(BaseModel):
     id: str
     similarPosts: list[SimilarPost] = Field(default_factory=list)
+
+
+class CommunityCommentCreate(BaseModel):
+    content: str = Field(min_length=1, max_length=1000)
+    isAnonymous: bool = False
+
+    @field_validator("content")
+    @classmethod
+    def strip_content(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("content must not be blank")
+        return stripped
+
+
+class CommunityCommentResponse(BaseModel):
+    id: str
+    postId: str
+    content: str
+    author: CommunityAuthor
+    isMine: bool
+    createdAt: datetime

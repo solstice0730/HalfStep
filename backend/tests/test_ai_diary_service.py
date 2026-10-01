@@ -3,7 +3,6 @@ from datetime import date, datetime
 
 import pytest
 from fastapi import HTTPException
-from openai import OpenAIError
 
 from app.core.config import settings
 from app.schemas.ai import (
@@ -17,22 +16,24 @@ from app.schemas.ai import (
 from app.services import ai as ai_service
 
 
-class FakeCompletions:
+from app.services.llm import LlmError
+
+
+class FakeLlm:
+    """LlmClient 대역: 고정 응답 또는 예외를 돌려준다."""
+
+    provider = "fake"
+
     def __init__(self, content: str | None = None, error: Exception | None = None) -> None:
         self._content = content
         self._error = error
+        self.calls: list[dict] = []
 
-    def create(self, **kwargs):
+    def complete(self, **kwargs):
+        self.calls.append(kwargs)
         if self._error:
             raise self._error
-        message = type("Message", (), {"content": self._content})()
-        choice = type("Choice", (), {"message": message})()
-        return type("Response", (), {"choices": [choice]})()
-
-
-class FakeClient:
-    def __init__(self, content: str | None = None, error: Exception | None = None) -> None:
-        self.chat = type("Chat", (), {"completions": FakeCompletions(content, error)})()
+        return self._content
 
 
 def _payload(**overrides) -> DiaryGenerateRequest:
@@ -53,7 +54,7 @@ def _payload(**overrides) -> DiaryGenerateRequest:
 
 def test_generate_diary_with_full_records_uses_ai_response(monkeypatch):
     ai_content = json.dumps({"title": "새로운 움직임을 보여준 하루", "content": "오늘은 뒤집기를 시도했어요."})
-    monkeypatch.setattr(ai_service, "_get_openai_client", lambda: FakeClient(content=ai_content))
+    monkeypatch.setattr(ai_service, "_get_llm_client", lambda: FakeLlm(content=ai_content))
 
     result = ai_service.generate_diary(_payload())
 
@@ -64,7 +65,7 @@ def test_generate_diary_with_full_records_uses_ai_response(monkeypatch):
 
 
 def test_generate_diary_without_photos_does_not_mention_photos(monkeypatch):
-    monkeypatch.setattr(ai_service, "_get_openai_client", lambda: None)
+    monkeypatch.setattr(ai_service, "_get_llm_client", lambda: None)
 
     result = ai_service.generate_diary(_payload(photoDescriptions=[]))
 
@@ -73,7 +74,7 @@ def test_generate_diary_without_photos_does_not_mention_photos(monkeypatch):
 
 
 def test_generate_diary_with_sparse_records_stays_short(monkeypatch):
-    monkeypatch.setattr(ai_service, "_get_openai_client", lambda: None)
+    monkeypatch.setattr(ai_service, "_get_llm_client", lambda: None)
     sparse = _payload(
         records=DiaryRecords(feeding=[FeedingRecord(recordedAt=datetime(2026, 7, 14, 8, 30), amountMl=100)]),
         memo=None,
@@ -96,8 +97,8 @@ def test_generate_diary_with_no_input_raises_validation_error():
 
 
 def test_generate_diary_falls_back_when_ai_call_fails(monkeypatch):
-    monkeypatch.setattr(ai_service, "_get_openai_client", lambda: FakeClient(error=OpenAIError("boom")))
-    monkeypatch.setattr(settings, "AI_FALLBACK_ENABLED", True)
+    monkeypatch.setattr(ai_service, "_get_llm_client", lambda: FakeLlm(error=LlmError("boom")))
+    monkeypatch.setattr(settings, "AI_DIARY_FALLBACK_ON_ERROR", True)
 
     result = ai_service.generate_diary(_payload())
 
@@ -106,20 +107,35 @@ def test_generate_diary_falls_back_when_ai_call_fails(monkeypatch):
 
 
 def test_generate_diary_raises_clean_error_when_ai_fails_and_fallback_disabled(monkeypatch):
-    monkeypatch.setattr(ai_service, "_get_openai_client", lambda: FakeClient(error=OpenAIError("boom")))
-    monkeypatch.setattr(settings, "AI_FALLBACK_ENABLED", False)
+    monkeypatch.setattr(ai_service, "_get_llm_client", lambda: FakeLlm(error=LlmError("boom")))
+    monkeypatch.setattr(settings, "AI_DIARY_FALLBACK_ON_ERROR", False)
 
     with pytest.raises(HTTPException) as exc_info:
         ai_service.generate_diary(_payload())
 
-    assert exc_info.value.status_code == 502
-    assert exc_info.value.detail == ai_service.DIARY_GENERATION_FAILED_DETAIL
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail == ai_service.DIARY_AI_BUSY_DETAIL
 
 
 def test_generate_diary_falls_back_when_ai_returns_invalid_json(monkeypatch):
-    monkeypatch.setattr(ai_service, "_get_openai_client", lambda: FakeClient(content="not json"))
-    monkeypatch.setattr(settings, "AI_FALLBACK_ENABLED", True)
+    monkeypatch.setattr(ai_service, "_get_llm_client", lambda: FakeLlm(content="not json"))
+    monkeypatch.setattr(settings, "AI_DIARY_FALLBACK_ON_ERROR", True)
 
     result = ai_service.generate_diary(_payload())
 
     assert result.generatedByAi is False
+
+
+def test_generate_diary_skips_model_when_only_one_material(monkeypatch):
+    llm = FakeLlm(content=json.dumps({"title": "x", "content": "y"}))
+    monkeypatch.setattr(ai_service, "_get_llm_client", lambda: llm)
+    sparse = _payload(
+        records=DiaryRecords(feeding=[FeedingRecord(recordedAt=datetime(2026, 7, 14, 8, 30), amountMl=100)]),
+        memo=None,
+        photoDescriptions=[],
+    )
+
+    result = ai_service.generate_diary(sparse)
+
+    assert result.generatedByAi is False
+    assert llm.calls == []

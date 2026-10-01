@@ -74,6 +74,28 @@ export async function socialLoginWithCode(
   };
 }
 
+/** refresh token으로 새 세션을 받는다. refresh token은 1회용이라 응답의 새 토큰으로 반드시 교체해야 한다. */
+export async function refreshSession(refreshToken: string): Promise<AuthSession> {
+  const response = await fetch(`${env.apiBaseUrl}/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ refreshToken })
+  });
+
+  if (!response.ok) {
+    throw new Error(await authErrorMessage(response, 'Session refresh failed.'));
+  }
+
+  const payload = (await response.json()) as SocialLoginResponse;
+  return {
+    accessToken: payload.data.accessToken,
+    refreshToken: payload.data.refreshToken,
+    user: payload.data.user
+  };
+}
+
 export async function logout(accessToken: string, refreshToken: string): Promise<void> {
   const response = await fetch(`${env.apiBaseUrl}/auth/logout`, {
     method: 'POST',

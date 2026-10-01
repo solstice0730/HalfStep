@@ -17,6 +17,10 @@ class LogoutRequest(BaseModel):
     refreshToken: str = Field(min_length=1)
 
 
+class RefreshRequest(BaseModel):
+    refreshToken: str = Field(min_length=1)
+
+
 class AuthUserResponse(BaseModel):
     id: str
     nickname: str | None = None

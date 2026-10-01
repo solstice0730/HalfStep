@@ -53,4 +53,4 @@ alembic current
 
 - 개발용 데모 로그인: `OAUTH_DEV_TOKENS_ENABLED=true`
 - AI fallback: `AI_FALLBACK_ENABLED=true`
-- 실제 OAuth secret과 `OPENAI_API_KEY`는 로컬 `.env`에서만 관리합니다.
+- 실제 OAuth secret과 `GEMINI_API_KEY`는 로컬 `.env`에서만 관리합니다.

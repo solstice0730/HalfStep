@@ -1,21 +1,10 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, type CompositeScreenProps } from "@react-navigation/native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { Camera, ChevronDown, ChevronRight, Flashlight, Send, User, X, Zap } from "lucide-react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  BookOpen,
-  CalendarDays,
-  Camera,
-  ChevronDown,
-  Flashlight,
-  Send,
-  Sparkles,
-  User,
-  X,
-  Zap
-} from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  ActivityIndicator,
   Animated,
   Image,
   Modal,
@@ -28,7 +17,8 @@ import {
   Text,
   TextInput,
   useWindowDimensions,
-  View
+  View,
+  type ImageSourcePropType
 } from "react-native";
 import {
   PanGestureHandler,
@@ -41,36 +31,59 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 
+import type { AppStackParamList } from "@/navigation/AppStackNavigator";
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { BabyProfileSheet } from "@/features/baby/components/BabyProfileSheet";
 import { useBaby } from "@/features/baby/hooks/useBaby";
 import { QuickLogMenu } from "@/features/home/components/QuickLogMenu";
-import { TodaySummary } from "@/features/home/components/TodaySummary";
+import { TodaySummary, type TodayCounts } from "@/features/home/components/TodaySummary";
 import { MyPageScreen } from "@/features/mypage/screens/MyPageScreen";
 import { calculateBabyAge, type BabyProfile } from "@/features/home/services/babyProfileService";
-import { getDiaryByDate } from "@/features/diary/services/diaryService";
-import { getTodayRecords } from "@/features/records/services/recordsService";
-import type { TodayRecords } from "@/features/records/types/records";
-import { askAiQuestion, fetchDailySummary, type AskResult, type DailySummaryResult } from "@/services/api/aiApi";
+import { DEFAULT_CURATION, getDashboard, type HomeCuration } from "@/features/home/services/homeService";
+import { FeedingRecordModal } from "@/features/records/components/FeedingRecordModal";
+import { SleepRecordModal } from "@/features/records/components/SleepRecordModal";
+import { StoolRecordModal } from "@/features/records/components/StoolRecordModal";
+import type { TimeValue } from "@/features/records/components/TimePickerField";
+import { UrineRecordModal } from "@/features/records/components/UrineRecordModal";
+import { addFeedingRecord, addSleepRecord, addStoolRecord, addUrineRecord, getTodayRecords } from "@/features/records/services/recordsService";
+import type { DiaperAmount, FeedingType, StoolColor, StoolForm, UrineColor } from "@/features/records/types/records";
+import { ApiRequestError } from "@/services/api/apiClient";
+import { uploadImage, type LocalImage } from "@/services/api/uploadApi";
 import { GlassSurface } from "@/shared/components/GlassSurface";
 import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
+import { Toast, useToast } from "@/shared/components/Toast";
 import { colors } from "@/shared/constants/colors";
 import { theme } from "@/shared/constants/theme";
 import { typography } from "@/shared/constants/typography";
+import { todayLocalIsoDate } from "@/shared/utils/date";
 
-const todayIsoDate = () => new Date().toISOString().slice(0, 10);
 const todayDisplayDate = () =>
   new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" });
 
-const curation = {
-  title: "오늘의 맞춤 큐레이션",
-  text: "이 시기에는 수유 텀과 낮잠 리듬이 조금씩 달라져요. 오늘은 수유 간격, 낮잠 길이, 배변 변화를 같이 확인해보세요.",
-  chips: ["수유 신호", "낮잠 루틴", "배변 체크"]
-};
+const pad2 = (value: string) => (value || "0").padStart(2, "0");
+const buildIsoDateTime = (date: string, time: TimeValue) => `${date}T${pad2(time.hour)}:${pad2(time.minute)}:00`;
 
-type HomeScreenProps = BottomTabScreenProps<MainTabParamList, "Home">;
+type HomeScreenProps = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, "Home">,
+  NativeStackScreenProps<AppStackParamList>
+>;
 type QuickSheetType = "medicine" | null;
+type RecordModalType = "feeding" | "sleep" | "urine" | "stool" | null;
+
+const RECORD_TILES: { type: Exclude<RecordModalType, null>; label: string; icon: ImageSourcePropType }[] = [
+  { type: "feeding", label: "수유", icon: require("../../../../assets/images/quick-feed.png") },
+  { type: "sleep", label: "수면", icon: require("../../../../assets/images/quick-sleep.png") },
+  { type: "urine", label: "소변", icon: require("../../../../assets/images/quick-diaper.png") },
+  { type: "stool", label: "대변", icon: require("../../../../assets/images/quick-diaper.png") }
+];
+
+const SAVED_TOAST: Record<Exclude<RecordModalType, null>, string> = {
+  feeding: "수유 기록이 저장되고 오늘 통계에 반영됐어요",
+  sleep: "수면 기록이 저장되고 오늘 통계에 반영됐어요",
+  urine: "소변 기록이 저장되고 오늘 통계에 반영됐어요",
+  stool: "대변 기록이 저장되고 오늘 통계에 반영됐어요"
+};
 
 const formatRecordTime = (date: Date) =>
   date.toLocaleTimeString("ko-KR", {
@@ -84,16 +97,8 @@ function BabyMascot() {
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(bob, {
-          duration: 1100,
-          toValue: 1,
-          useNativeDriver: true
-        }),
-        Animated.timing(bob, {
-          duration: 1100,
-          toValue: 0,
-          useNativeDriver: true
-        })
+        Animated.timing(bob, { duration: 1100, toValue: 1, useNativeDriver: true }),
+        Animated.timing(bob, { duration: 1100, toValue: 0, useNativeDriver: true })
       ])
     );
 
@@ -101,15 +106,8 @@ function BabyMascot() {
     return () => loop.stop();
   }, [bob]);
 
-  const translateY = bob.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -10]
-  });
-
-  const rotate = bob.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["-2deg", "2deg"]
-  });
+  const translateY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -10] });
+  const rotate = bob.interpolate({ inputRange: [0, 1], outputRange: ["-2deg", "2deg"] });
 
   return (
     <View style={styles.mascotWrap}>
@@ -122,19 +120,13 @@ function BabyMascot() {
   );
 }
 
-function EntryButton({ icon, label, onPress }: { icon: ReactNode; label: string; onPress: () => void }) {
+function RecordTile({ icon, label, onPress }: { icon: ImageSourcePropType; label: string; onPress: () => void }) {
   return (
-    <Pressable style={styles.entryButtonFlex} onPress={onPress}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${label} 기록`} style={styles.tileFlex} onPress={onPress}>
       {({ pressed }) => (
-        <GlassSurface
-          radius={theme.radius.md}
-          intensity={24}
-          noShadow
-          style={pressed && styles.pressed}
-          contentStyle={styles.entryButtonContent}
-        >
-          {icon}
-          <Text style={styles.entryButtonText}>{label}</Text>
+        <GlassSurface radius={theme.radius.lg} intensity={26} noShadow style={pressed && styles.pressed} contentStyle={styles.tileContent}>
+          <Image source={icon} resizeMode="contain" style={styles.tileIcon} />
+          <Text style={styles.tileText}>{label}</Text>
         </GlassSurface>
       )}
     </Pressable>
@@ -144,7 +136,7 @@ function EntryButton({ icon, label, onPress }: { icon: ReactNode; label: string;
 type AsyncStatus = "idle" | "loading" | "success" | "error";
 
 export function HomeScreen({ navigation }: HomeScreenProps) {
-  const { accessToken } = useAuth();
+  const { accessToken, signOut } = useAuth();
   const { activeBaby, error: babyError, isLoading: isBabyLoading, refresh: refreshBabies } = useBaby();
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
@@ -157,7 +149,6 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   const [quickOpen, setQuickOpen] = useState(false);
   const [myPageOpen, setMyPageOpen] = useState(false);
   const [quickSheet, setQuickSheet] = useState<QuickSheetType>(null);
-  const [chatOpen, setChatOpen] = useState(false);
   const [babyMenuOpen, setBabyMenuOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -167,13 +158,11 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   const [medicineName, setMedicineName] = useState("");
   const [medicineDose, setMedicineDose] = useState("");
   const [lastQuickRecord, setLastQuickRecord] = useState<string | null>(null);
-  const [summaryStatus, setSummaryStatus] = useState<AsyncStatus>("idle");
-  const [dailySummary, setDailySummary] = useState<DailySummaryResult | null>(null);
-  const [questionInput, setQuestionInput] = useState("");
-  const [askStatus, setAskStatus] = useState<AsyncStatus>("idle");
-  const [askResult, setAskResult] = useState<AskResult | null>(null);
-  const [todayRecords, setTodayRecords] = useState<TodayRecords>({ feeding: [], sleep: [], urine: [], stool: [] });
-  const [diarySaved, setDiarySaved] = useState(false);
+  const [counts, setCounts] = useState<TodayCounts>({ feeding: 0, sleep: 0, diaper: 0, photos: 0 });
+  const [curation, setCuration] = useState<HomeCuration>(DEFAULT_CURATION);
+  const [activeRecordModal, setActiveRecordModal] = useState<RecordModalType>(null);
+  const [saveStatus, setSaveStatus] = useState<AsyncStatus>("idle");
+  const { message: toastMessage, showToast } = useToast();
 
   const babyProfile = useMemo<BabyProfile | null>(() => activeBaby ? ({
     id: activeBaby.id,
@@ -183,45 +172,43 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   }) : null, [activeBaby]);
   const profileStatus: AsyncStatus = isBabyLoading ? "loading" : babyError ? "error" : "success";
 
-  const loadTodaySummary = useCallback(async () => {
+  // 대시보드가 오늘 요약 + 큐레이션을 함께 준다. 실패하면 기록 목록으로 요약만이라도 채운다.
+  const loadDashboard = useCallback(async () => {
     if (!accessToken || !activeBaby) return;
     try {
-      const [records, diary] = await Promise.all([
-        getTodayRecords(accessToken, activeBaby.id, todayIsoDate()),
-        getDiaryByDate(accessToken, activeBaby.id, todayIsoDate())
-      ]);
-      setTodayRecords(records);
-      setDiarySaved(diary !== null);
+      const dashboard = await getDashboard(accessToken, activeBaby.id);
+      const summary = dashboard.todaySummary;
+      setCounts({
+        feeding: summary.feedingCount,
+        sleep: summary.sleepCount,
+        diaper: summary.urineCount + summary.stoolCount,
+        photos: summary.photoCount
+      });
+      setCuration(dashboard.curation ?? DEFAULT_CURATION);
     } catch {
-      // 홈 요약은 부가 정보이므로 실패해도 화면은 계속 사용 가능해야 한다.
+      try {
+        const records = await getTodayRecords(accessToken, activeBaby.id, todayLocalIsoDate());
+        setCounts({
+          feeding: records.feeding.length,
+          sleep: records.sleep.length,
+          diaper: records.urine.length + records.stool.length,
+          photos: 0
+        });
+      } catch {
+        // 홈 요약은 부가 정보이므로 실패해도 화면은 계속 사용 가능해야 한다.
+      }
     }
   }, [accessToken, activeBaby]);
 
+  const refreshHome = loadDashboard;
+
   useFocusEffect(
     useCallback(() => {
-      void loadTodaySummary();
-    }, [loadTodaySummary])
+      void refreshHome();
+    }, [refreshHome])
   );
 
   const babyAge = babyProfile ? calculateBabyAge(babyProfile.birthDate) : null;
-
-  const loadDailySummary = async () => {
-    if (!accessToken || !activeBaby) return;
-    setSummaryStatus("loading");
-    try {
-      const result = await fetchDailySummary(accessToken, activeBaby.id, todayIsoDate());
-      setDailySummary(result);
-      setSummaryStatus("success");
-    } catch {
-      setSummaryStatus("error");
-    }
-  };
-
-  useEffect(() => {
-    if (chatOpen) {
-      void loadDailySummary();
-    }
-  }, [chatOpen]);
 
   // contentOffset only applies on the ScrollView's very first layout pass, which can race
   // ahead of a late/large initial measurement (e.g. tablets) and leave the pager showing the
@@ -230,37 +217,79 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     pagerRef.current?.scrollTo({ x: screenWidth, y: 0, animated: false });
   }, [screenWidth]);
 
-  const handleAskQuestion = async () => {
-    const question = questionInput.trim();
-    if (!accessToken || !activeBaby || !question) return;
-    setAskStatus("loading");
+  // --- 빠른 기록 저장 (영상 02): 홈 위에서 시트로 저장하고 즉시 요약·큐레이션을 갱신한다. ---
+  const saveRecord = async (type: Exclude<RecordModalType, null>, request: () => Promise<unknown>): Promise<boolean> => {
+    if (saveStatus === "loading") return false;
+    setSaveStatus("loading");
     try {
-      const result = await askAiQuestion(accessToken, activeBaby.id, todayIsoDate(), question);
-      setAskResult(result);
-      setAskStatus("success");
-    } catch {
-      setAskStatus("error");
+      await request();
+      setSaveStatus("success");
+      setActiveRecordModal(null);
+      showToast(SAVED_TOAST[type]);
+      await refreshHome();
+      return true;
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.kind === "auth") {
+        await signOut();
+        return false;
+      }
+      setSaveStatus("error");
+      showToast(error instanceof ApiRequestError ? error.message : "기록을 저장하지 못했어요. 다시 시도해 주세요.");
+      return false;
     }
+  };
+
+  const handleSaveFeeding = async (record: { time: TimeValue; feedingType: FeedingType; amountMl?: number; durationMinutes?: number }) => {
+    if (!accessToken || !activeBaby) return false;
+    return saveRecord("feeding", () => addFeedingRecord(accessToken, activeBaby.id, {
+      occurredAt: buildIsoDateTime(todayLocalIsoDate(), record.time),
+      feedingType: record.feedingType,
+      amountMl: record.amountMl,
+      durationMinutes: record.durationMinutes
+    }));
+  };
+
+  const handleSaveSleep = async (record: { start: TimeValue; end: TimeValue }) => {
+    if (!accessToken || !activeBaby) return false;
+    return saveRecord("sleep", () => addSleepRecord(accessToken, activeBaby.id, {
+      startedAt: buildIsoDateTime(todayLocalIsoDate(), record.start),
+      endedAt: buildIsoDateTime(todayLocalIsoDate(), record.end)
+    }));
+  };
+
+  const handleSaveUrine = async (record: { time: TimeValue; amount: DiaperAmount; color: UrineColor }) => {
+    if (!accessToken || !activeBaby) return false;
+    return saveRecord("urine", () => addUrineRecord(accessToken, activeBaby.id, {
+      occurredAt: buildIsoDateTime(todayLocalIsoDate(), record.time),
+      amount: record.amount,
+      color: record.color
+    }));
+  };
+
+  const handleSaveStool = async (record: { time: TimeValue; amount: DiaperAmount; color: StoolColor; form: StoolForm; photo?: LocalImage }) => {
+    if (!accessToken || !activeBaby) return false;
+    return saveRecord("stool", async () => {
+      const photoUrl = record.photo ? await uploadImage(accessToken, record.photo) : undefined;
+      return addStoolRecord(accessToken, activeBaby.id, {
+        occurredAt: buildIsoDateTime(todayLocalIsoDate(), record.time),
+        amount: record.amount,
+        color: record.color,
+        form: record.form,
+        photoUrl
+      });
+    });
   };
 
   const openCamera = () => {
     setCameraOpen(true);
     cameraTranslateX.setValue(-screenWidth);
     requestAnimationFrame(() => {
-      Animated.timing(cameraTranslateX, {
-        duration: 220,
-        toValue: 0,
-        useNativeDriver: true
-      }).start();
+      Animated.timing(cameraTranslateX, { duration: 220, toValue: 0, useNativeDriver: true }).start();
     });
   };
 
   const closeCamera = () => {
-    Animated.timing(cameraTranslateX, {
-      duration: 190,
-      toValue: -screenWidth,
-      useNativeDriver: true
-    }).start(() => {
+    Animated.timing(cameraTranslateX, { duration: 190, toValue: -screenWidth, useNativeDriver: true }).start(() => {
       setLastShot(null);
       setCameraOpen(false);
     });
@@ -270,20 +299,12 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     setMyPageOpen(true);
     myPageTranslateY.setValue(-screenHeight);
     requestAnimationFrame(() => {
-      Animated.timing(myPageTranslateY, {
-        duration: 260,
-        toValue: 0,
-        useNativeDriver: true
-      }).start();
+      Animated.timing(myPageTranslateY, { duration: 260, toValue: 0, useNativeDriver: true }).start();
     });
   };
 
   const closeMyPage = () => {
-    Animated.timing(myPageTranslateY, {
-      duration: 220,
-      toValue: -screenHeight,
-      useNativeDriver: true
-    }).start(() => {
+    Animated.timing(myPageTranslateY, { duration: 220, toValue: -screenHeight, useNativeDriver: true }).start(() => {
       setMyPageOpen(false);
     });
   };
@@ -312,16 +333,10 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     setQuickOpen(false);
   };
 
-  const openQuickRecord = (type: "feeding" | "sleep" | "urine" | "stool") => {
+  const openRecordModal = (type: Exclude<RecordModalType, null>) => {
     closeQuickLog();
-    navigation.navigate("Records", { openRecordModal: type });
-  };
-
-  // 배변은 실제 API가 소변/대변을 구분해서 저장하므로, 홈에서는 어느 쪽인지 단정하지 않고
-  // 기록 화면으로만 이동시켜 사용자가 직접 고르게 한다.
-  const openDiaperRecords = () => {
-    closeQuickLog();
-    navigation.navigate("Records");
+    setSaveStatus("idle");
+    setActiveRecordModal(type);
   };
 
   const openQuickSheet = (type: QuickSheetType) => {
@@ -355,26 +370,18 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         },
         onPanResponderRelease: (_, gesture) => {
           if (gesture.dx > screenWidth * 0.28 && Math.abs(gesture.dy) < 56) {
-            Animated.timing(cameraTranslateX, {
-              duration: 150,
-              toValue: 0,
-              useNativeDriver: true
-            }).start();
+            Animated.timing(cameraTranslateX, { duration: 150, toValue: 0, useNativeDriver: true }).start();
             return;
           }
 
-          Animated.timing(cameraTranslateX, {
-            duration: 160,
-            toValue: -screenWidth,
-            useNativeDriver: true
-          }).start(() => setCameraOpen(false));
+          Animated.timing(cameraTranslateX, { duration: 160, toValue: -screenWidth, useNativeDriver: true }).start(() =>
+            setCameraOpen(false)
+          );
         },
         onPanResponderTerminate: () => {
-          Animated.timing(cameraTranslateX, {
-            duration: 160,
-            toValue: -screenWidth,
-            useNativeDriver: true
-          }).start(() => setCameraOpen(false));
+          Animated.timing(cameraTranslateX, { duration: 160, toValue: -screenWidth, useNativeDriver: true }).start(() =>
+            setCameraOpen(false)
+          );
         }
       }),
     [cameraTranslateX, screenWidth]
@@ -396,17 +403,12 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
       return;
     }
 
-    Animated.spring(cameraTranslateX, {
-      toValue: 0,
-      useNativeDriver: true,
-      friction: 9,
-      tension: 80
-    }).start();
+    Animated.spring(cameraTranslateX, { toValue: 0, useNativeDriver: true, friction: 9, tension: 80 }).start();
   };
 
   const renderHomeContent = (handlers?: ReturnType<typeof PanResponder.create>["panHandlers"]) => (
     <View style={[styles.page, { width: screenWidth }]} {...handlers}>
-      <View style={styles.homeRoot}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.homeRoot}>
         {quickOpen && <Pressable style={styles.quickDismissLayer} onPress={closeQuickLog} />}
         <View style={styles.header}>
           <Pressable accessibilityRole="button" accessibilityLabel="아기 프로필 변경" onPress={() => setBabyMenuOpen(true)}>
@@ -424,9 +426,9 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
             <QuickLogMenu
               open={quickOpen}
               onToggle={() => setQuickOpen((open) => !open)}
-              onFeeding={() => openQuickRecord("feeding")}
-              onSleep={() => openQuickRecord("sleep")}
-              onDiaper={openDiaperRecords}
+              onFeeding={() => openRecordModal("feeding")}
+              onSleep={() => openRecordModal("sleep")}
+              onDiaper={() => openRecordModal("stool")}
               onMedicine={() => openQuickSheet("medicine")}
             />
           </View>
@@ -442,18 +444,17 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
           babyProfile={babyProfile}
           babyAge={babyAge}
           onRetryProfile={() => void refreshBabies()}
-          todayRecords={todayRecords}
-          diarySaved={diarySaved}
+          counts={counts}
           lastQuickRecord={lastQuickRecord}
         />
 
-        <View style={styles.entryRow}>
-          <EntryButton icon={<BookOpen color={colors.primary} size={18} />} label="기록" onPress={() => navigation.navigate("Records")} />
-          <EntryButton icon={<Sparkles color={colors.primary} size={18} />} label="AI 일기" onPress={() => navigation.navigate("Records")} />
-          <EntryButton icon={<CalendarDays color={colors.primary} size={18} />} label="캘린더" onPress={() => navigation.navigate("Calendar")} />
+        <View style={styles.tileRow}>
+          {RECORD_TILES.map((tile) => (
+            <RecordTile key={tile.type} icon={tile.icon} label={tile.label} onPress={() => openRecordModal(tile.type)} />
+          ))}
         </View>
 
-        <Pressable onPress={() => setChatOpen(true)}>
+        <Pressable accessibilityRole="button" accessibilityLabel="육아코치에게 물어보기" onPress={() => navigation.navigate("AiChat")}>
           <GlassSurface radius={theme.radius.xxl} intensity={30} contentStyle={styles.questionBox}>
             <Text style={styles.questionText}>아기가 전해줬으면 하는 말이 있나요?</Text>
             <LinearGradient colors={["#F2B6BF", colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.sendButton}>
@@ -462,21 +463,29 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
           </GlassSurface>
         </Pressable>
 
-        <GlassSurface radius={theme.radius.xl} intensity={32} contentStyle={styles.curationCard}>
-          <View style={styles.curationHeader}>
-            <Text style={styles.curationTitle}>{curation.title}</Text>
-            <Sparkles color={colors.accent} size={18} />
-          </View>
-          <Text style={styles.curationText}>{curation.text}</Text>
-          <View style={styles.chipRow}>
-            {curation.chips.map((chip) => (
-              <Text key={chip} numberOfLines={1} style={styles.chip}>#{chip}</Text>
-            ))}
-          </View>
-        </GlassSurface>
+        <Pressable accessibilityRole="button" accessibilityLabel="주간 리포트 열기" onPress={() => navigation.navigate("WeeklyReport")}>
+          {({ pressed }) => (
+            <GlassSurface radius={theme.radius.xl} intensity={32} style={pressed && styles.pressed} contentStyle={styles.curationCard}>
+              <View style={styles.curationHeader}>
+                <Text style={styles.curationTitle}>{curation.headline}</Text>
+              </View>
+              <Text style={styles.curationText}>{curation.text}</Text>
+              <View style={styles.chipRow}>
+                {curation.chips.map((chip) => (
+                  <Text key={chip} numberOfLines={1} style={styles.chip}>#{chip}</Text>
+                ))}
+              </View>
+              <View style={styles.curationFooter}>
+                <Text style={styles.curationFooterText}>주간 리포트 보기</Text>
+                <ChevronRight color={colors.primary} size={14} />
+              </View>
+            </GlassSurface>
+          )}
+        </Pressable>
 
-        <View style={{ height: tabBarHeight }} />
-      </View>
+        {/* 탭바와 플로팅 챗봇 버튼이 큐레이션 카드를 가리지 않도록 여유를 둔다. */}
+        <View style={{ height: tabBarHeight + 72 }} />
+      </ScrollView>
     </View>
   );
 
@@ -561,7 +570,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
               {lastShot && (
                 <GlassSurface radius={theme.radius.xxl} intensity={50} style={styles.recordPromptShell} contentStyle={styles.recordPrompt}>
                   <Text style={styles.recordPromptTitle}>이 사진을 일기에 올릴까요?</Text>
-                  <Text style={styles.recordPromptText}>일기 작성 화면에 사진이 자동으로 추가돼요.</Text>
+                  <Text style={styles.recordPromptText}>일기 재료 화면에 사진이 자동으로 추가돼요.</Text>
                   <View style={styles.recordPromptActions}>
                     <Pressable style={styles.retakeButton} onPress={() => setLastShot(null)}>
                       <Text style={styles.retakeButtonText}>다시 찍기</Text>
@@ -588,7 +597,11 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
       </Modal>
 
       {currentPage === 1 && (
-        <Pressable style={[styles.chatFloat, { bottom: tabBarHeight + 14 }]} onPress={() => setChatOpen(true)}>
+        <Pressable
+          accessibilityLabel="육아코치 열기"
+          style={[styles.chatFloat, { bottom: tabBarHeight + 14 }]}
+          onPress={() => navigation.navigate("AiChat")}
+        >
           <Image source={require("../../../../assets/images/chatbot-home.png")} resizeMode="contain" style={styles.chatFloatImage} />
         </Pressable>
       )}
@@ -627,78 +640,21 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         </View>
       </Modal>
 
-      <Modal visible={chatOpen} transparent animationType="fade" onRequestClose={() => setChatOpen(false)}>
-        <View style={styles.modalBackdrop}>
-          <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
-          <GlassSurface radius={theme.radius.xxl} intensity={55} style={styles.chatModalShell} contentStyle={styles.chatModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>AI 육아 코치</Text>
-              <Pressable onPress={() => setChatOpen(false)}>
-                <X color={colors.primaryDark} size={22} />
-              </Pressable>
-            </View>
-            <View style={styles.chatBotFace}>
-              <Image source={require("../../../../assets/images/chatbot-home.png")} resizeMode="contain" style={styles.chatBotImage} />
-            </View>
-            <Text style={styles.chatQuestion}>리몽이의 기록을 바탕으로 무엇을 알려드릴까요?</Text>
+      {activeRecordModal === "feeding" && (
+        <FeedingRecordModal isSaving={saveStatus === "loading"} onClose={() => setActiveRecordModal(null)} onSave={handleSaveFeeding} visible />
+      )}
+      {activeRecordModal === "sleep" && (
+        <SleepRecordModal isSaving={saveStatus === "loading"} onClose={() => setActiveRecordModal(null)} onSave={handleSaveSleep} visible />
+      )}
+      {activeRecordModal === "urine" && (
+        <UrineRecordModal isSaving={saveStatus === "loading"} onClose={() => setActiveRecordModal(null)} onSave={handleSaveUrine} visible />
+      )}
+      {activeRecordModal === "stool" && (
+        <StoolRecordModal isSaving={saveStatus === "loading"} onClose={() => setActiveRecordModal(null)} onSave={handleSaveStool} visible />
+      )}
 
-            {summaryStatus === "loading" && <ActivityIndicator color={colors.primary} />}
-            {summaryStatus === "error" && (
-              <View style={styles.chatErrorBox}>
-                <Text style={styles.chatErrorText}>오늘 요약을 불러오지 못했어요.</Text>
-                <Pressable onPress={loadDailySummary}>
-                  <Text style={styles.chatRetryText}>다시 시도</Text>
-                </Pressable>
-              </View>
-            )}
-            {summaryStatus === "success" && dailySummary && (
-              <View style={[styles.chatBubble, dailySummary.recordCount === 0 && styles.chatBubbleMuted]}>
-                <Text style={styles.chatBubbleText}>{dailySummary.summary}</Text>
-                {dailySummary.highlights.length > 0 && (
-                  <Text style={styles.chatHighlights}>{dailySummary.highlights.join(" · ")}</Text>
-                )}
-              </View>
-            )}
-
-            <View style={styles.chatInputRow}>
-              <TextInput
-                placeholder="예: 요즘 낮잠이 짧아졌는데 괜찮을까요?"
-                placeholderTextColor={colors.textMuted}
-                style={styles.chatInput}
-                value={questionInput}
-                onChangeText={setQuestionInput}
-                onSubmitEditing={handleAskQuestion}
-              />
-              <Pressable
-                style={styles.chatSendButton}
-                onPress={handleAskQuestion}
-                disabled={askStatus === "loading" || questionInput.trim().length === 0}
-              >
-                <Send color="#FFFFFF" size={16} />
-              </Pressable>
-            </View>
-
-            {askStatus === "loading" && <ActivityIndicator color={colors.primary} />}
-            {askStatus === "error" && (
-              <View style={styles.chatErrorBox}>
-                <Text style={styles.chatErrorText}>답변을 가져오지 못했어요.</Text>
-                <Pressable onPress={handleAskQuestion}>
-                  <Text style={styles.chatRetryText}>다시 시도</Text>
-                </Pressable>
-              </View>
-            )}
-            {askStatus === "success" && askResult && (
-              <View style={[styles.chatBubble, askResult.source === "no_data" && styles.chatBubbleMuted]}>
-                <Text style={styles.chatBubbleText}>{askResult.answer}</Text>
-                <Text style={styles.chatSafetyText}>{askResult.safetyNotice}</Text>
-              </View>
-            )}
-
-            <Text style={styles.subscriptionNote}>구독하면 기록 기반 개인화 답변과 주간 리포트를 받을 수 있어요.</Text>
-          </GlassSurface>
-        </View>
-      </Modal>
       <BabyProfileSheet visible={babyMenuOpen} onClose={() => setBabyMenuOpen(false)} />
+      <Toast message={toastMessage} bottom={tabBarHeight + 16} />
       </SafeAreaView>
     </View>
   );
@@ -718,7 +674,7 @@ const styles = StyleSheet.create({
     flex: 1
   },
   homeRoot: {
-    flex: 1,
+    flexGrow: 1,
     gap: 13,
     paddingBottom: 18,
     paddingHorizontal: 18,
@@ -760,9 +716,8 @@ const styles = StyleSheet.create({
     gap: 8
   },
   mascotPanel: {
-    flex: 1.15,
     justifyContent: "center",
-    minHeight: 270,
+    minHeight: 250,
     position: "relative"
   },
   mascotWrap: {
@@ -776,26 +731,29 @@ const styles = StyleSheet.create({
     height: 228,
     width: 174
   },
-  entryRow: {
+  tileRow: {
     flexDirection: "row",
     gap: 8
   },
-  entryButtonFlex: {
+  tileFlex: {
     flex: 1
   },
   pressed: {
     opacity: 0.72
   },
-  entryButtonContent: {
+  tileContent: {
     alignItems: "center",
-    flexDirection: "row",
     gap: 6,
     justifyContent: "center",
-    paddingVertical: 10
+    paddingVertical: 12
   },
-  entryButtonText: {
+  tileIcon: {
+    height: 26,
+    width: 28
+  },
+  tileText: {
     color: colors.primaryDark,
-    ...typography.caption1,
+    fontSize: 12,
     fontWeight: "800"
   },
   questionBox: {
@@ -819,7 +777,7 @@ const styles = StyleSheet.create({
     width: 34
   },
   curationCard: {
-    padding: 13
+    padding: 14
   },
   curationHeader: {
     alignItems: "center",
@@ -857,6 +815,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     textAlign: "center"
+  },
+  curationFooter: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 2,
+    justifyContent: "flex-end",
+    marginTop: 10
+  },
+  curationFooterText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "800"
   },
   chatFloat: {
     alignItems: "center",
@@ -1075,11 +1045,6 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: "900"
   },
-  modalText: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 22
-  },
   sheetInput: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -1099,100 +1064,5 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "900"
-  },
-  chatModalShell: {},
-  chatModal: {
-    alignItems: "center",
-    gap: 14,
-    padding: 22
-  },
-  chatBotFace: {
-    alignItems: "center",
-    backgroundColor: "transparent",
-    borderRadius: 999,
-    height: 112,
-    justifyContent: "center",
-    width: 112
-  },
-  chatBotImage: {
-    height: 112,
-    width: 112
-  },
-  chatQuestion: {
-    color: colors.primaryDark,
-    fontSize: 18,
-    fontWeight: "900",
-    lineHeight: 25,
-    textAlign: "center"
-  },
-  chatBubble: {
-    backgroundColor: colors.surface,
-    borderRadius: 18,
-    gap: 6,
-    padding: 14,
-    width: "100%"
-  },
-  chatBubbleMuted: {
-    backgroundColor: colors.surfaceSoft
-  },
-  chatBubbleText: {
-    color: colors.text,
-    fontSize: 14,
-    lineHeight: 20
-  },
-  chatHighlights: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  chatSafetyText: {
-    color: colors.textMuted,
-    fontSize: 11,
-    lineHeight: 16
-  },
-  chatInputRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-    width: "100%"
-  },
-  chatInput: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    color: colors.primaryDark,
-    flex: 1,
-    fontSize: 14,
-    minHeight: 44,
-    paddingHorizontal: 14
-  },
-  chatSendButton: {
-    alignItems: "center",
-    backgroundColor: colors.primary,
-    borderRadius: 999,
-    height: 40,
-    justifyContent: "center",
-    width: 40
-  },
-  chatErrorBox: {
-    alignItems: "center",
-    gap: 4,
-    width: "100%"
-  },
-  chatErrorText: {
-    color: colors.danger,
-    fontSize: 13
-  },
-  chatRetryText: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  subscriptionNote: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: "800",
-    textAlign: "center"
   }
 });

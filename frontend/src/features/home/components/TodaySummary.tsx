@@ -1,11 +1,17 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { BabyAge, BabyProfile } from "@/features/home/services/babyProfileService";
-import type { TodayRecords } from "@/features/records/types/records";
 import { colors } from "@/shared/constants/colors";
 import { withWaGwa } from "@/shared/utils/koreanParticle";
 
 type ProfileStatus = "idle" | "loading" | "success" | "error";
+
+export interface TodayCounts {
+  feeding: number;
+  sleep: number;
+  diaper: number;
+  photos: number;
+}
 
 interface TodaySummaryProps {
   todayDate: string;
@@ -13,8 +19,7 @@ interface TodaySummaryProps {
   babyProfile: BabyProfile | null;
   babyAge: BabyAge | null;
   onRetryProfile: () => void;
-  todayRecords: TodayRecords;
-  diarySaved: boolean;
+  counts: TodayCounts;
   lastQuickRecord: string | null;
 }
 
@@ -24,13 +29,14 @@ export function TodaySummary({
   babyProfile,
   babyAge,
   onRetryProfile,
-  todayRecords,
-  diarySaved,
+  counts,
   lastQuickRecord
 }: TodaySummaryProps) {
+  const eyebrow = babyAge ? `${todayDate} · 생후 ${babyAge.ageMonths}개월` : todayDate;
+
   return (
     <View style={styles.wrap}>
-      <Text style={styles.todayDateText}>{todayDate}</Text>
+      <Text style={styles.todayDateText}>{eyebrow}</Text>
 
       {profileStatus === "loading" && <ActivityIndicator color={colors.primary} style={styles.profileSpinner} />}
 
@@ -46,7 +52,7 @@ export function TodaySummary({
       {profileStatus === "success" && !babyProfile && (
         <View style={styles.profileGuidance}>
           <Text style={styles.profileGuidanceTitle}>등록된 아기 정보가 없습니다.</Text>
-          <Text style={styles.profileGuidanceText}>아기 프로필을 등록하면 맞춤 기록과 AI 일기를 사용할 수 있어요.</Text>
+          <Text style={styles.profileGuidanceText}>아기 프로필을 등록하면 맞춤 기록과 일기를 사용할 수 있어요.</Text>
         </View>
       )}
 
@@ -58,8 +64,7 @@ export function TodaySummary({
       )}
 
       <Text style={styles.quickStatusText}>
-        오늘 기록 · 수유 {todayRecords.feeding.length}회 · 수면 {todayRecords.sleep.length}회 · 배변{" "}
-        {todayRecords.urine.length + todayRecords.stool.length}회 · AI 일지 {diarySaved ? "저장됨" : "미저장"}
+        오늘 기록 · 수유 {counts.feeding}회 · 수면 {counts.sleep}회 · 배변 {counts.diaper}회 · 사진 {counts.photos}장
       </Text>
       {lastQuickRecord && <Text style={styles.quickStatusText}>{lastQuickRecord}</Text>}
     </View>

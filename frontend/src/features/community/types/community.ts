@@ -65,6 +65,8 @@ export interface CommunityPostListItem {
   babyAgeMonths: number | null;
   author: CommunityAuthor;
   likeCount: number;
+  isLiked: boolean;
+  isBookmarked: boolean;
   commentCount: number;
   imageCount: number;
   createdAt: string;
@@ -73,8 +75,34 @@ export interface CommunityPostListItem {
 export interface CommunityPostDetail extends CommunityPostListItem {
   content: string;
   imageUrls: string[];
-  isLiked: boolean;
   updatedAt: string;
+}
+
+export interface CommunityComment {
+  id: string;
+  postId: string;
+  content: string;
+  author: CommunityAuthor;
+  isMine: boolean;
+  createdAt: string;
+}
+
+export interface ReactionState {
+  likeCount: number;
+  isLiked: boolean;
+  isBookmarked: boolean;
+}
+
+/** 아기 개월 수를 커뮤니티 월령 그룹으로 매핑한다 (backend AGE_GROUPS와 동일 구간). */
+export function ageGroupForMonths(months: number): Exclude<AgeGroup, "ALL_AGES"> | null {
+  if (months < 0) return null;
+  if (months <= 2) return "M0_2";
+  if (months <= 5) return "M3_5";
+  if (months <= 8) return "M6_8";
+  if (months <= 11) return "M9_11";
+  if (months <= 17) return "M12_17";
+  if (months <= 24) return "M18_24";
+  return null;
 }
 
 export interface GetPostsParams {

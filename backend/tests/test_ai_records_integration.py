@@ -52,14 +52,14 @@ class AiRecordsIntegrationTest(unittest.TestCase):
             )
         )
         self.db.commit()
-        self.original_api_key = settings.OPENAI_API_KEY
-        settings.OPENAI_API_KEY = ""
+        self.original_provider = settings.AI_PROVIDER
+        settings.AI_PROVIDER = "none"
         app.dependency_overrides[get_db] = lambda: self.db
         app.dependency_overrides[get_current_user] = lambda: self.user
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
-        settings.OPENAI_API_KEY = self.original_api_key
+        settings.AI_PROVIDER = self.original_provider
         app.dependency_overrides.clear()
         self.db.close()
         self.engine.dispose()

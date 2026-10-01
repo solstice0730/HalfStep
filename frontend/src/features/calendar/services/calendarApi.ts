@@ -26,7 +26,14 @@ export interface CalendarDay {
   date: string;
   diary: CalendarDiary | null;
   timeline: CalendarTimelineItem[];
-  daySummary: { feedingCount: number; sleepTotalMinutes: number; urineCount: number; stoolCount: number };
+  daySummary: {
+    feedingCount: number;
+    sleepTotalMinutes: number;
+    urineCount: number;
+    stoolCount: number;
+    photoCount: number;
+    chatCount: number;
+  };
 }
 
 export interface CalendarDiary {

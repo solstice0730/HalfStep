@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
-from app.schemas.ai import AskRequest, DailySummaryRequest, DiaryGenerateRequest
-from app.services.ai import answer_question, generate_daily_summary, generate_diary
+from app.schemas.ai import AskRequest, DailySummaryRequest, DiaryGenerateRequest, PhotoAnalyzeRequest
+from app.services.ai import analyze_photos, answer_question, generate_daily_summary, generate_diary
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -30,6 +30,15 @@ def diary_generate(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     result = generate_diary(payload)
+    return {"success": True, "data": result.model_dump()}
+
+
+@router.post("/photos/analyze", status_code=status.HTTP_200_OK)
+def photos_analyze(
+    payload: PhotoAnalyzeRequest,
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    result = analyze_photos(payload.photoUrls)
     return {"success": True, "data": result.model_dump()}
 
 
