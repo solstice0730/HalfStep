@@ -2146,3 +2146,13 @@ POST /files/presigned-url
 | GET | `/reports/weekly` | `insight`는 규칙 기반 초안을 Gemini가 문장만 다듬은 결과(모델 없으면 초안 그대로) |
 
 프론트 `apiClient`는 401을 받으면 `/auth/refresh`로 한 번 갱신해 재시도하고, 그래도 401이면 로그아웃한다.
+
+### 14.2 기본 CRUD 보완
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| PUT | `/posts/{id}` | 작성자만. `{category?, title?, content?, imageUrls?, babyAgeMonths?, clearBabyAge?, isAnonymous?}` → 상세 응답. 타인 403 |
+| DELETE | `/posts/{id}` | 작성자만. 공감·저장·댓글도 함께 삭제. 타인 403 |
+| DELETE | `/records/{id}` | 아기 소유자만. 남의 기록은 404 |
+
+목록·상세 항목에 `isMine`(내 글 여부)이 추가됐다. 일기는 기존 `PUT/DELETE /diary/{id}`를 캘린더의 "고쳐 쓰기" 화면이 사용한다.

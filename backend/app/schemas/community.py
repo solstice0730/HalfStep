@@ -22,6 +22,27 @@ class CommunityPostCreate(BaseModel):
         return value.strip()
 
 
+class CommunityPostUpdate(BaseModel):
+    category: str | None = None
+    title: str | None = Field(default=None, min_length=2, max_length=150)
+    content: str | None = Field(default=None, min_length=2, max_length=10000)
+    imageUrls: list[str] | None = Field(default=None, max_length=5)
+    babyAgeMonths: int | None = Field(default=None, ge=0, le=24)
+    isAnonymous: bool | None = None
+    # babyAgeMonths를 "월령 무관"으로 되돌리고 싶을 때 true
+    clearBabyAge: bool = False
+
+    @field_validator("category")
+    @classmethod
+    def normalize_category(cls, value: str | None) -> str | None:
+        return value.strip().upper() if value else value
+
+    @field_validator("title", "content")
+    @classmethod
+    def strip_text(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else value
+
+
 class CommunityAuthor(BaseModel):
     userId: str | None = None
     nickname: str

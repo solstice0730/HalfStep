@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { ArrowLeft, Send, Trash2, UserRound } from "lucide-react-native";
+import { ArrowLeft, Pencil, Send, Trash2, UserRound } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -7,7 +7,7 @@ import { useFocusEffect } from "@react-navigation/native";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { ReactionBar } from "@/features/community/components/ReactionBar";
-import { addComment, deleteComment, getComments, getPostById, setPostReaction } from "@/features/community/services/communityService";
+import { addComment, deleteComment, deletePost, getComments, getPostById, setPostReaction } from "@/features/community/services/communityService";
 import { CATEGORY_LABELS, type CommunityComment, type CommunityPostDetail } from "@/features/community/types/community";
 import { confirmAsync } from "@/shared/utils/confirm";
 import type { AppStackParamList } from "@/navigation/AppStackNavigator";
@@ -83,6 +83,18 @@ export function CommunityDetailScreen({ route, navigation }: Props) {
     }
   };
 
+  const handleDeletePost = async () => {
+    if (!accessToken || !post) return;
+    const confirmed = await confirmAsync("글을 삭제할까요?", "댓글과 공감도 함께 사라지고 되돌릴 수 없어요.", { confirmText: "삭제", destructive: true });
+    if (!confirmed) return;
+    try {
+      await deletePost(accessToken, post.id);
+      navigation.goBack();
+    } catch (error) {
+      setCommentError(error instanceof ApiRequestError ? error.message : "글을 삭제하지 못했어요. 다시 시도해 주세요.");
+    }
+  };
+
   const submitComment = async () => {
     const content = commentInput.trim();
     if (!accessToken || !post || !content || commentSubmitting) return;
@@ -126,7 +138,22 @@ export function CommunityDetailScreen({ route, navigation }: Props) {
           </GlassSurface>
         </Pressable>
         <Text style={styles.headerTitle}>게시글</Text>
-        <View style={styles.headerSpacer} />
+        {status === "found" && post?.isMine ? (
+          <View style={styles.headerActions}>
+            <Pressable accessibilityLabel="글 수정" hitSlop={10} onPress={() => navigation.navigate("CommunityWrite", { post })}>
+              <GlassSurface radius={theme.radius.pill} intensity={28} noShadow contentStyle={styles.backButton}>
+                <Pencil color={colors.primaryDark} size={18} />
+              </GlassSurface>
+            </Pressable>
+            <Pressable accessibilityLabel="글 삭제" hitSlop={10} onPress={() => void handleDeletePost()}>
+              <GlassSurface radius={theme.radius.pill} intensity={28} noShadow contentStyle={styles.backButton}>
+                <Trash2 color={colors.danger} size={18} />
+              </GlassSurface>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
       </View>
 
       {status === "loading" && <ActivityIndicator color={colors.primary} style={styles.centerSpinner} />}
@@ -263,6 +290,10 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40
+  },
+  headerActions: {
+    flexDirection: "row",
+    gap: 6
   },
   headerTitle: {
     color: colors.primaryDark,

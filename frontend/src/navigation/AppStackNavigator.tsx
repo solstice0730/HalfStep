@@ -2,7 +2,10 @@ import type { NavigatorScreenParams } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { AiChatScreen } from "@/features/chatbot/screens/AiChatScreen";
+import type { CalendarDiary } from "@/features/calendar/services/calendarApi";
 import { CommunityDetailScreen } from "@/features/community/screens/CommunityDetailScreen";
+import type { CommunityPostDetail } from "@/features/community/types/community";
+import { DiaryEditScreen } from "@/features/diary/screens/DiaryEditScreen";
 import { CommunityWriteScreen } from "@/features/community/screens/CommunityWriteScreen";
 import { DiaryResultScreen } from "@/features/diary/screens/DiaryResultScreen";
 import type { DiaryMaterialCounts, DiaryPhotoDraft } from "@/features/diary/types/diary";
@@ -21,7 +24,8 @@ export type AppStackParamList = {
     materialCounts: DiaryMaterialCounts;
   };
   CommunityDetail: { postId: string };
-  CommunityWrite: undefined;
+  CommunityWrite: { post?: CommunityPostDetail } | undefined;
+  DiaryEdit: { diary: CalendarDiary };
   AiChat: undefined;
   WeeklyReport: undefined;
 };
@@ -35,6 +39,7 @@ export function AppStackNavigator() {
       <Stack.Screen name="DiaryResult" component={DiaryResultScreen} options={{ presentation: "card" }} />
       <Stack.Screen name="CommunityDetail" component={CommunityDetailScreen} options={{ presentation: "card" }} />
       <Stack.Screen name="CommunityWrite" component={CommunityWriteScreen} options={{ presentation: "card" }} />
+      <Stack.Screen name="DiaryEdit" component={DiaryEditScreen} options={{ presentation: "card" }} />
       <Stack.Screen name="AiChat" component={AiChatScreen} options={{ presentation: "card" }} />
       <Stack.Screen name="WeeklyReport" component={WeeklyReportScreen} options={{ presentation: "card" }} />
     </Stack.Navigator>

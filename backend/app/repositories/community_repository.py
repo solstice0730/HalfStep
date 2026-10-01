@@ -163,3 +163,11 @@ def get_comment(db: Session, comment_id: int) -> CommunityComment | None:
 def delete_comment(db: Session, comment: CommunityComment) -> None:
     db.delete(comment)
     db.flush()
+
+
+def delete_post(db: Session, post: CommunityPost) -> None:
+    """게시글과 딸린 공감·저장·댓글을 함께 지운다 (SQLite처럼 FK cascade가 꺼진 환경도 안전하게)."""
+    db.query(CommunityPostReaction).filter(CommunityPostReaction.post_id == post.id).delete(synchronize_session=False)
+    db.query(CommunityComment).filter(CommunityComment.post_id == post.id).delete(synchronize_session=False)
+    db.delete(post)
+    db.flush()

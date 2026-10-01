@@ -112,6 +112,54 @@ class ImprovementsApiTest(unittest.TestCase):
         self.assertEqual(self.client.post(f"/api/posts/{post_id}/comments", json={"content": "   "}).status_code, 422)
         self.assertEqual(self.client.post("/api/posts/999/comments", json={"content": "x"}).status_code, 404)
 
+    # --- 게시글 수정·삭제 ---------------------------------------------------------------
+
+    def test_post_update_and_delete_by_author_only(self) -> None:
+        post_id = self.client.post(
+            "/api/posts",
+            json={"category": "FREE", "title": "처음 제목", "content": "처음 내용입니다.", "imageUrls": [],
+                  "babyAgeMonths": 5, "isAnonymous": False},
+        ).json()["data"]["id"]
+        self.client.post(f"/api/posts/{post_id}/like")
+        self.client.post(f"/api/posts/{post_id}/comments", json={"content": "댓글"})
+        self.assertTrue(self.client.get(f"/api/posts/{post_id}").json()["data"]["isMine"])
+
+        app.dependency_overrides[get_current_user] = lambda: self.other
+        self.assertFalse(self.client.get(f"/api/posts/{post_id}").json()["data"]["isMine"])
+        self.assertEqual(self.client.put(f"/api/posts/{post_id}", json={"title": "남이 수정"}).status_code, 403)
+        self.assertEqual(self.client.delete(f"/api/posts/{post_id}").status_code, 403)
+
+        app.dependency_overrides[get_current_user] = lambda: self.user
+        updated = self.client.put(
+            f"/api/posts/{post_id}", json={"title": "고친 제목", "content": "고친 내용입니다.", "clearBabyAge": True, "isAnonymous": True}
+        )
+        self.assertEqual(updated.status_code, 200, updated.text)
+        data = updated.json()["data"]
+        self.assertEqual((data["title"], data["content"], data["babyAgeMonths"]), ("고친 제목", "고친 내용입니다.", None))
+        self.assertEqual(data["author"]["nickname"], "익명")
+        self.assertEqual(data["likeCount"], 1)
+        self.assertEqual(self.client.put(f"/api/posts/{post_id}", json={"category": "NOPE"}).status_code, 400)
+        self.assertEqual(self.client.put(f"/api/posts/{post_id}", json={"title": "x"}).status_code, 422)
+
+        self.assertEqual(self.client.delete(f"/api/posts/{post_id}").status_code, 200)
+        self.assertEqual(self.client.get(f"/api/posts/{post_id}").status_code, 404)
+        self.assertEqual(self.client.get("/api/posts").json()["data"], [])
+
+    # --- 기록 삭제 ---------------------------------------------------------------------------
+
+    def test_record_delete_by_owner_only(self) -> None:
+        created = self.client.post(
+            "/api/records/feeding",
+            json={"babyId": self.baby.id, "occurredAt": "2026-10-01T09:00:00+09:00", "feedingType": "FORMULA", "amountMl": 120},
+        ).json()["data"]
+        app.dependency_overrides[get_current_user] = lambda: self.other
+        self.assertEqual(self.client.delete(f"/api/records/{created['id']}").status_code, 404)
+        app.dependency_overrides[get_current_user] = lambda: self.user
+        self.assertEqual(self.client.delete(f"/api/records/{created['id']}").status_code, 200)
+        self.assertEqual(self.client.delete(f"/api/records/{created['id']}").status_code, 404)
+        listed = self.client.get("/api/records", params={"babyId": self.baby.id, "date": "2026-10-01"}).json()["data"]
+        self.assertEqual(listed, [])
+
     # --- 보호자 메모 ---------------------------------------------------------------------
 
     def test_memo_upsert_keeps_one_per_day_and_blank_deletes(self) -> None:

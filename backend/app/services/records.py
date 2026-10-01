@@ -31,6 +31,15 @@ def create_record(db: Session, *, user: User, log_type: str, values: dict) -> Ca
     return log
 
 
+def delete_record(db: Session, *, user: User, record_id: int) -> None:
+    """기록 삭제. 아기 소유자만 지울 수 있고, 남의 기록은 존재 여부를 숨기기 위해 404."""
+    log = records_repository.get_log(db, record_id)
+    if log is None or records_repository.get_accessible_baby(db, baby_id=log.baby_id, user_id=user.id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found.")
+    records_repository.delete_log(db, log)
+    db.commit()
+
+
 def list_records(db: Session, *, user: User, baby_id: int, log_type: str | None, target_date: date, cursor: str | None, limit: int):
     require_baby_access(db, baby_id, user)
     normalized_type = log_type.upper() if log_type else None

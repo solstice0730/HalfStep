@@ -89,6 +89,10 @@ export async function getTodayRecords(accessToken: string, babyId: number, date:
   };
 }
 
+export async function deleteRecord(accessToken: string, recordId: string): Promise<void> {
+  await apiRequest<null>(`/records/${recordId}`, { method: "DELETE", accessToken });
+}
+
 export async function addFeedingRecord(
   accessToken: string,
   babyId: number,

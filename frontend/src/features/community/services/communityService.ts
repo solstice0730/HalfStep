@@ -6,7 +6,8 @@ import type {
   CreatePostInput,
   GetPostsParams,
   GetPostsResult,
-  ReactionState
+  ReactionState,
+  UpdatePostInput
 } from "@/features/community/types/community";
 
 const DEFAULT_LIMIT = 5;
@@ -32,6 +33,15 @@ export async function createPost(accessToken: string, input: CreatePostInput): P
     body: input
   });
   return { id: data.id };
+}
+
+export async function updatePost(accessToken: string, postId: string, input: UpdatePostInput): Promise<CommunityPostDetail> {
+  const { data } = await apiRequest<CommunityPostDetail>(`/posts/${postId}`, { method: "PUT", accessToken, body: input });
+  return data;
+}
+
+export async function deletePost(accessToken: string, postId: string): Promise<void> {
+  await apiRequest<null>(`/posts/${postId}`, { method: "DELETE", accessToken });
 }
 
 export async function getComments(accessToken: string, postId: string): Promise<CommunityComment[]> {

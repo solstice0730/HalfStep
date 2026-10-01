@@ -1,6 +1,7 @@
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, type CompositeScreenProps } from "@react-navigation/native";
 import { useBottomTabBarHeight, type BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { ChevronLeft, ChevronRight, PenLine } from "lucide-react-native";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { ChevronLeft, ChevronRight, Pencil, PenLine, Trash2 } from "lucide-react-native";
 import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -9,6 +10,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useBaby } from "@/features/baby/hooks/useBaby";
 import { getCalendarDay, getCalendarMonth, type CalendarDay, type CalendarDiary, type CalendarTimelineItem } from "@/features/calendar/services/calendarApi";
+import { deleteRecord } from "@/features/records/services/recordsService";
+import type { AppStackParamList } from "@/navigation/AppStackNavigator";
 import type { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { ApiRequestError } from "@/services/api/apiClient";
 import { GlassSurface } from "@/shared/components/GlassSurface";
@@ -16,10 +19,14 @@ import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
 import { colors } from "@/shared/constants/colors";
 import { theme } from "@/shared/constants/theme";
 import { typography } from "@/shared/constants/typography";
+import { confirmAsync } from "@/shared/utils/confirm";
 import { todayLocalIsoDate } from "@/shared/utils/date";
 import { withUi } from "@/shared/utils/koreanParticle";
 
-type CalendarScreenProps = BottomTabScreenProps<MainTabParamList, "Calendar">;
+type CalendarScreenProps = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, "Calendar">,
+  NativeStackScreenProps<AppStackParamList>
+>;
 
 type AsyncStatus = "idle" | "loading" | "error";
 
@@ -134,6 +141,29 @@ export function CalendarScreen({ navigation }: CalendarScreenProps) {
     setSelectedDate(date);
     void loadDay(date);
   };
+
+  // 잘못 넣은 기록은 타임라인에서 바로 지운다. 지운 뒤 월 표시(점·썸네일)도 같이 갱신한다.
+  const removeRecord = async (item: CalendarTimelineItem) => {
+    if (!accessToken) return;
+    const confirmed = await confirmAsync("이 기록을 지울까요?", `${item.time.slice(11, 16)} ${item.summary}`, { confirmText: "지우기", destructive: true });
+    if (!confirmed) return;
+    try {
+      await deleteRecord(accessToken, item.id);
+      await Promise.all([loadDay(selectedDate), loadMonth()]);
+    } catch (error) {
+      if (await handleAuthError(error)) return;
+    }
+  };
+
+  const TimelineRow = ({ item }: { item: CalendarTimelineItem }) => (
+    <View style={styles.timelineRow}>
+      <Text style={styles.timelineTime}>{item.time.slice(11, 16)}</Text>
+      <Text style={styles.timelineSummary}>{item.summary}</Text>
+      <Pressable accessibilityLabel="기록 지우기" hitSlop={8} onPress={() => void removeRecord(item)}>
+        <Trash2 color={colors.textMuted} size={15} />
+      </Pressable>
+    </View>
+  );
 
   const gridCells = useMemo(() => {
     const total = daysInMonth(year, month);
@@ -267,19 +297,22 @@ export function CalendarScreen({ navigation }: CalendarScreenProps) {
                   ))}
                 </View>
               )}
-              <Text style={styles.storyMeta}>
-                기록 {timeline.length} · 사진 {daySummary.photoCount} · 이야기 {daySummary.chatCount}
-              </Text>
+              <View style={styles.storyFooter}>
+                <Text style={styles.storyMeta}>
+                  기록 {timeline.length} · 사진 {daySummary.photoCount} · 이야기 {daySummary.chatCount}
+                </Text>
+                <Pressable accessibilityLabel="일기 고쳐 쓰기" style={styles.storyEdit} onPress={() => navigation.navigate("DiaryEdit", { diary: dayDiary })}>
+                  <Pencil color={colors.primary} size={13} />
+                  <Text style={styles.storyEditText}>고쳐 쓰기</Text>
+                </Pressable>
+              </View>
             </View>
 
             {timeline.length > 0 && (
               <View style={styles.flowSection}>
                 <Text style={styles.flowTitle}>그날의 흐름</Text>
                 {timeline.map((item) => (
-                  <View key={item.id} style={styles.timelineRow}>
-                    <Text style={styles.timelineTime}>{item.time.slice(11, 16)}</Text>
-                    <Text style={styles.timelineSummary}>{item.summary}</Text>
-                  </View>
+                  <TimelineRow key={item.id} item={item} />
                 ))}
               </View>
             )}
@@ -294,10 +327,7 @@ export function CalendarScreen({ navigation }: CalendarScreenProps) {
                 <Text style={styles.emptyTitle}>아직 이 날의 이야기는 쓰지 않았어요</Text>
                 <View style={styles.flowSectionCompact}>
                   {timeline.map((item) => (
-                    <View key={item.id} style={styles.timelineRow}>
-                      <Text style={styles.timelineTime}>{item.time.slice(11, 16)}</Text>
-                      <Text style={styles.timelineSummary}>{item.summary}</Text>
-                    </View>
+                    <TimelineRow key={item.id} item={item} />
                   ))}
                 </View>
               </>
@@ -538,6 +568,21 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 11,
     fontWeight: "700"
+  },
+  storyFooter: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  storyEdit: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4
+  },
+  storyEditText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "800"
   },
   flowSection: {
     borderTopColor: colors.border,

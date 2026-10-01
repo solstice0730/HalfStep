@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
-from app.schemas.community import CommunityCommentCreate, CommunityPostCreate
+from app.schemas.community import CommunityCommentCreate, CommunityPostCreate, CommunityPostUpdate
 from app.services import community as community_service
 
 router = APIRouter(prefix="/posts", tags=["community"])
@@ -47,6 +47,33 @@ def get_post(
         }
     )
     return {"success": True, "data": data}
+
+
+@router.put("/{post_id}")
+def update_post(
+    post_id: int,
+    payload: CommunityPostUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    post = community_service.update_community_post(db, post_id=post_id, user=current_user, payload=payload)
+    state = community_service.reaction_state(db, posts=[post], user_id=current_user.id)[post.id]
+    data = community_service.serialize_list_item(post, **state)
+    data.update(
+        {
+            "content": post.content,
+            "imageUrls": post.image_urls or [],
+            "author": community_service.serialize_author(post, include_user_id=True),
+            "updatedAt": post.updated_at,
+        }
+    )
+    return {"success": True, "data": data}
+
+
+@router.delete("/{post_id}")
+def delete_post(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+    community_service.delete_community_post(db, post_id=post_id, user=current_user)
+    return {"success": True, "data": None}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

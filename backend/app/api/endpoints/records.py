@@ -70,3 +70,9 @@ def create_stool(payload: StoolRecordCreate, db: Session = Depends(get_db), user
                 "color": payload.color, "form": payload.form, "photoUrl": payload.photoUrl}},
     )
     return {"success": True, "data": records_service.serialize_log(log)}
+
+
+@router.delete("/{record_id}")
+def delete_record(record_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> dict:
+    records_service.delete_record(db, user=user, record_id=record_id)
+    return {"success": True, "data": None}

@@ -7,11 +7,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { createPost } from "@/features/community/services/communityService";
+import { createPost, updatePost } from "@/features/community/services/communityService";
 import {
   AGE_GROUP_LABELS,
   AGE_GROUP_OPTIONS,
   AGE_GROUP_REPRESENTATIVE_MONTHS,
+  ageGroupForMonths,
   CATEGORY_LABELS,
   CATEGORY_OPTIONS,
   MAX_POST_IMAGES,
@@ -20,7 +21,7 @@ import {
 } from "@/features/community/types/community";
 import type { AppStackParamList } from "@/navigation/AppStackNavigator";
 import { ApiRequestError } from "@/services/api/apiClient";
-import { uploadImages } from "@/services/api/uploadApi";
+import { uploadImage, type LocalImage } from "@/services/api/uploadApi";
 import { GlassSurface } from "@/shared/components/GlassSurface";
 import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
 import { colors } from "@/shared/constants/colors";
@@ -34,14 +35,21 @@ function toBabyAgeMonths(ageGroup: AgeGroup): number | null {
   return AGE_GROUP_REPRESENTATIVE_MONTHS[ageGroup];
 }
 
-export function CommunityWriteScreen({ navigation }: Props) {
+// 이미 올라간 사진(http URL)은 그대로 쓰고, 새로 고른 사진만 업로드한다.
+type PostImage = LocalImage;
+const isRemote = (uri: string) => uri.startsWith("http://") || uri.startsWith("https://");
+
+export function CommunityWriteScreen({ navigation, route }: Props) {
   const { accessToken, signOut } = useAuth();
-  const [category, setCategory] = useState<CommunityCategoryCode>(CATEGORY_OPTIONS[0]);
-  const [ageGroup, setAgeGroup] = useState<AgeGroup>("ALL_AGES");
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [isAnonymous, setIsAnonymous] = useState(false);
-  const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const editing = route.params?.post ?? null;
+  const [category, setCategory] = useState<CommunityCategoryCode>(editing?.category ?? CATEGORY_OPTIONS[0]);
+  const [ageGroup, setAgeGroup] = useState<AgeGroup>(
+    editing?.babyAgeMonths != null ? (ageGroupForMonths(editing.babyAgeMonths) ?? "ALL_AGES") : "ALL_AGES"
+  );
+  const [title, setTitle] = useState(editing?.title ?? "");
+  const [content, setContent] = useState(editing?.content ?? "");
+  const [isAnonymous, setIsAnonymous] = useState(editing?.author.isAnonymous ?? false);
+  const [images, setImages] = useState<PostImage[]>(editing ? editing.imageUrls.map((uri) => ({ uri })) : []);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,13 +88,27 @@ export function CommunityWriteScreen({ navigation }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const imageUrls = await uploadImages(accessToken, images);
+      const imageUrls = await Promise.all(images.map((image) => (isRemote(image.uri) ? image.uri : uploadImage(accessToken, image))));
+      const babyAgeMonths = toBabyAgeMonths(ageGroup);
+      if (editing) {
+        await updatePost(accessToken, editing.id, {
+          category,
+          title: title.trim(),
+          content: content.trim(),
+          imageUrls,
+          babyAgeMonths: babyAgeMonths ?? undefined,
+          clearBabyAge: babyAgeMonths === null,
+          isAnonymous
+        });
+        navigation.goBack();
+        return;
+      }
       const result = await createPost(accessToken, {
         category,
         title: title.trim(),
         content: content.trim(),
         imageUrls,
-        babyAgeMonths: toBabyAgeMonths(ageGroup),
+        babyAgeMonths,
         isAnonymous
       });
       navigation.replace("CommunityDetail", { postId: result.id });
@@ -95,7 +117,7 @@ export function CommunityWriteScreen({ navigation }: Props) {
         await signOut();
         return;
       }
-      setError("게시글을 작성하지 못했습니다.\n잠시 후 다시 시도해 주세요.");
+      setError(editing ? "게시글을 수정하지 못했습니다.\n잠시 후 다시 시도해 주세요." : "게시글을 작성하지 못했습니다.\n잠시 후 다시 시도해 주세요.");
       setSubmitting(false);
     }
   };
@@ -110,7 +132,7 @@ export function CommunityWriteScreen({ navigation }: Props) {
             <ArrowLeft color={colors.primaryDark} size={22} />
           </GlassSurface>
         </Pressable>
-        <Text style={styles.headerTitle}>글쓰기</Text>
+        <Text style={styles.headerTitle}>{editing ? "글 수정" : "글쓰기"}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -192,7 +214,7 @@ export function CommunityWriteScreen({ navigation }: Props) {
 
         <Pressable disabled={!canSubmit} onPress={handleSubmit} style={!canSubmit && styles.submitButtonDisabled}>
           <LinearGradient colors={["#F2B6BF", colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.submitButton}>
-            {submitting ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.submitButtonText}>게시하기</Text>}
+            {submitting ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.submitButtonText}>{editing ? "수정 완료" : "게시하기"}</Text>}
           </LinearGradient>
         </Pressable>
       </ScrollView>

@@ -67,6 +67,7 @@ export interface CommunityPostListItem {
   likeCount: number;
   isLiked: boolean;
   isBookmarked: boolean;
+  isMine: boolean;
   commentCount: number;
   imageCount: number;
   createdAt: string;
@@ -103,6 +104,16 @@ export function ageGroupForMonths(months: number): Exclude<AgeGroup, "ALL_AGES">
   if (months <= 17) return "M12_17";
   if (months <= 24) return "M18_24";
   return null;
+}
+
+export interface UpdatePostInput {
+  category?: CommunityCategoryCode;
+  title?: string;
+  content?: string;
+  imageUrls?: string[];
+  babyAgeMonths?: number;
+  clearBabyAge?: boolean;
+  isAnonymous?: boolean;
 }
 
 export interface GetPostsParams {

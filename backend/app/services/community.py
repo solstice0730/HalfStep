@@ -8,7 +8,7 @@ from app.models.community import CommunityPost
 from app.models.community_comment import CommunityComment
 from app.models.user import User
 from app.repositories import community_repository
-from app.schemas.community import CommunityPostCreate
+from app.schemas.community import CommunityPostCreate, CommunityPostUpdate
 
 AGE_GROUPS = {
     "M0_2": (0, 2),
@@ -97,12 +97,13 @@ def serialize_list_item(
     is_liked: bool = False,
     is_bookmarked: bool = False,
     comment_count: int = 0,
+    is_mine: bool = False,
 ) -> dict:
     preview = post.content[:100] + ("..." if len(post.content) > 100 else "")
     return {
         "id": str(post.id), "category": post.category.code, "title": post.title,
         "preview": preview, "author": serialize_author(post), "likeCount": like_count,
-        "isLiked": is_liked, "isBookmarked": is_bookmarked,
+        "isLiked": is_liked, "isBookmarked": is_bookmarked, "isMine": is_mine,
         "babyAgeMonths": post.baby_age_months, "commentCount": comment_count,
         "imageCount": len(post.image_urls or []), "createdAt": post.created_at,
     }
@@ -123,6 +124,7 @@ def reaction_state(db: Session, *, posts: list[CommunityPost], user_id: int) -> 
             "is_liked": (post.id, "LIKE") in mine,
             "is_bookmarked": (post.id, "BOOKMARK") in mine,
             "comment_count": comment_counts.get(post.id, 0),
+            "is_mine": post.user_id == user_id,
         }
         for post in posts
     }
@@ -205,3 +207,40 @@ def serialize_comment(comment: CommunityComment, *, user_id: int) -> dict:
         "isMine": comment.user_id == user_id,
         "createdAt": comment.created_at,
     }
+
+
+def _get_owned_post(db: Session, *, post_id: int, user_id: int) -> CommunityPost:
+    post = get_community_post(db, post_id)
+    if post.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the author can change this post.")
+    return post
+
+
+def update_community_post(db: Session, *, post_id: int, user: User, payload: CommunityPostUpdate) -> CommunityPost:
+    post = _get_owned_post(db, post_id=post_id, user_id=user.id)
+    if payload.category is not None:
+        category = community_repository.get_category_by_code(db, payload.category)
+        if category is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid category.")
+        post.category = category
+    if payload.title is not None:
+        post.title = payload.title
+    if payload.content is not None:
+        post.content = payload.content
+    if payload.imageUrls is not None:
+        post.image_urls = payload.imageUrls
+    if payload.clearBabyAge:
+        post.baby_age_months = None
+    elif payload.babyAgeMonths is not None:
+        post.baby_age_months = payload.babyAgeMonths
+    if payload.isAnonymous is not None:
+        post.is_anonymous = payload.isAnonymous
+    db.commit()
+    db.refresh(post)
+    return post
+
+
+def delete_community_post(db: Session, *, post_id: int, user: User) -> None:
+    post = _get_owned_post(db, post_id=post_id, user_id=user.id)
+    community_repository.delete_post(db, post)
+    db.commit()

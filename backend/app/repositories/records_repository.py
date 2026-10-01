@@ -50,3 +50,12 @@ def list_logs(
             )
         )
     return list(db.scalars(statement).all())
+
+
+def get_log(db: Session, log_id: int) -> CareLog | None:
+    return db.get(CareLog, log_id)
+
+
+def delete_log(db: Session, log: CareLog) -> None:
+    db.delete(log)
+    db.flush()
