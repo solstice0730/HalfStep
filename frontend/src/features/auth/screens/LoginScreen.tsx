@@ -69,14 +69,15 @@ export function LoginScreen() {
           ))}
         </View>
 
-        {__DEV__ && <DevLoginButton />}
+        {(__DEV__ || env.enableDevLogin) && <DevLoginButton />}
       </GlassSurface>
     </View>
   );
 }
 
 // ponytail: dev-only bypass so QA on a physical device (Expo Go) can log in without real
-// OAuth keys configured. __DEV__ is false in production builds, so this never ships.
+// OAuth keys configured. __DEV__ is false in production builds; external testers can opt in with
+// EXPO_PUBLIC_ENABLE_DEV_LOGIN=true (backend must also enable OAUTH_DEV_TOKENS_ENABLED).
 function DevLoginButton() {
   const { signInWithProviderToken } = useAuth();
   const [isSigningIn, setIsSigningIn] = useState(false);
