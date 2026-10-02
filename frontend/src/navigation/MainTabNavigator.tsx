@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     borderColor: colors.glassBorder
   },
   tabBarTint: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.glassStrong
   }
 });

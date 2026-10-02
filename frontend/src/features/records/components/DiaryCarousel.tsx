@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     flex: 1
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "#111827"
   },
   topBar: {
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
     overflow: "visible"
   },
   stageGestureLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "transparent",
     zIndex: 40
   },
@@ -298,11 +298,11 @@ const styles = StyleSheet.create({
     borderRadius: 30
   },
   imageShade: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.18)"
   },
   cardGestureLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "transparent",
     zIndex: 30
   },

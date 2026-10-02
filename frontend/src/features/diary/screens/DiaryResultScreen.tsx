@@ -129,6 +129,7 @@ export function DiaryResultScreen({ route, navigation }: DiaryResultScreenProps)
     if (!response || titleInvalid || contentInvalid || saveStatus === "loading" || !accessToken || !activeBaby) return;
     setSaveStatus("loading");
     setSaveError(null);
+    let saveStep: "check" | "upload" | "save" = "check";
     try {
       // 같은 날짜 일기는 서버가 덮어쓰므로 저장 전에 한 번 확인한다.
       const existing = await getDiaryByDate(accessToken, activeBaby.id, date);
@@ -144,7 +145,9 @@ export function DiaryResultScreen({ route, navigation }: DiaryResultScreenProps)
         }
       }
       // 재료 화면에서 이미 업로드한 사진은 URL을 재사용하고, 실패했던 사진만 다시 올린다.
+      saveStep = "upload";
       const imageUrls = await Promise.all(photos.map((photo) => photo.url ?? uploadImage(accessToken, { uri: photo.uri })));
+      saveStep = "save";
       await saveDiary(accessToken, {
         babyId: activeBaby.id,
         date,
@@ -165,7 +168,9 @@ export function DiaryResultScreen({ route, navigation }: DiaryResultScreenProps)
         return;
       }
       setSaveStatus("error");
-      setSaveError("일기를 저장하지 못했습니다.\n잠시 후 다시 시도해 주세요.");
+      if (__DEV__) console.warn("Diary save failed", saveStep, error instanceof Error ? error.message : String(error));
+      const stepMessage = saveStep === "upload" ? "사진 업로드에 실패했습니다." : "일기를 저장하지 못했습니다.";
+      setSaveError(`${stepMessage}\n${error instanceof ApiRequestError ? error.message : "잠시 후 다시 시도해 주세요."}`);
     }
   };
 

@@ -13,10 +13,10 @@ import type {
 const DEFAULT_LIMIT = 5;
 
 export async function getPosts(accessToken: string, params: GetPostsParams = {}): Promise<GetPostsResult> {
-  const { category, ageGroup, cursor, limit = DEFAULT_LIMIT } = params;
+  const { category, ageGroup, query, cursor, limit = DEFAULT_LIMIT } = params;
   const { data, meta } = await apiRequest<CommunityPostListItem[]>("/posts", {
     accessToken,
-    query: { category, ageGroup, cursor: cursor ?? undefined, limit }
+    query: { category, ageGroup, q: query || undefined, cursor: cursor ?? undefined, limit }
   });
   return { items: data, nextCursor: meta?.hasNext ? meta.cursor : null };
 }

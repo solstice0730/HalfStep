@@ -445,10 +445,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary
   },
   cellPhoto: {
-    ...StyleSheet.absoluteFillObject
+    ...StyleSheet.absoluteFill
   },
   cellPhotoShade: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(32,26,23,0.28)"
   },
   cellPhotoText: {
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
     width: "100%"
   },
   heroShade: {
-    ...StyleSheet.absoluteFillObject
+    ...StyleSheet.absoluteFill
   },
   heroTexts: {
     bottom: 16,

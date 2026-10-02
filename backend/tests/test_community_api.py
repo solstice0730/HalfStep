@@ -115,6 +115,33 @@ class CommunityApiTest(unittest.TestCase):
         response = self.client.get("/api/posts", params={"ageGroup": "ALL_AGES"})
         self.assertEqual([post["id"] for post in response.json()["data"]], [independent])
 
+    def test_searches_title_and_content_with_filters_and_cursor(self) -> None:
+        first = self.create_post("NEWBORN", "유모차 첫 외출", 2).json()["data"]["id"]
+        second = self.client.post("/api/posts", json={
+            "category": "NEWBORN", "title": "외출 준비", "content": "유모차를 접어 차에 싣는 연습을 했어요.",
+            "imageUrls": [], "babyAgeMonths": 2, "isAnonymous": False,
+        }).json()["data"]["id"]
+        self.create_post("NEWBORN", "수면 기록", 2)
+        self.create_post("FREE", "유모차 이야기", 4)
+
+        first_page = self.client.get("/api/posts", params={"q": "유모차", "category": "NEWBORN", "ageGroup": "M0_2", "limit": 1}).json()
+        self.assertEqual([post["id"] for post in first_page["data"]], [second])
+        self.assertTrue(first_page["meta"]["hasNext"])
+        second_page = self.client.get("/api/posts", params={
+            "q": "유모차", "category": "NEWBORN", "ageGroup": "M0_2", "limit": 1,
+            "cursor": first_page["meta"]["cursor"],
+        }).json()
+        self.assertEqual([post["id"] for post in second_page["data"]], [first])
+        self.assertFalse(second_page["meta"]["hasNext"])
+        self.assertEqual(self.client.get("/api/posts", params={"q": "없는 검색어"}).json()["data"], [])
+
+    def test_search_treats_wildcards_as_literal_text(self) -> None:
+        self.create_post(title="100% 사용기")
+        self.create_post(title="100명 사용기")
+        result = self.client.get("/api/posts", params={"q": "%"}).json()
+        self.assertEqual([post["title"] for post in result["data"]], ["100% 사용기"])
+        self.assertEqual(self.client.get("/api/posts", params={"q": "x" * 81}).status_code, 422)
+
     def test_authentication_is_required(self) -> None:
         app.dependency_overrides.pop(get_current_user)
         response = self.client.get("/api/posts")

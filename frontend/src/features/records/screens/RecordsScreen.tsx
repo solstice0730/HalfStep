@@ -156,9 +156,9 @@ export function RecordsScreen({ route, navigation }: RecordsScreenProps) {
         }
         try {
           const [item] = await analyzePhotos(accessToken, [url]);
-          patch({ caption: item?.caption ?? null, status: "ready" });
+          patch({ caption: item?.caption ?? null, status: item?.caption ? "ready" : "error" });
         } catch {
-          patch({ status: "ready" });
+          patch({ status: "error" });
         }
       })();
     },

@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "HalfStep",
+    "name": "반걸음",
     "slug": "halfstep",
     "version": "0.1.0",
+    "icon": "./assets/images/app-icon.png",
     "orientation": "portrait",
     "scheme": "halfstep",
     "userInterfaceStyle": "light",
@@ -18,10 +19,32 @@
         {
           "photosPermission": "일기에 사진을 추가하기 위해 사진 보관함 접근 권한이 필요합니다."
         }
+      ],
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFF8F3",
+          "image": "./assets/images/app-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain"
+        }
+      ],
+      "expo-secure-store",
+      "expo-status-bar",
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
       ]
     ],
     "ios": {
       "bundleIdentifier": "com.solstice0730.halfstep",
+      "icon": "./assets/images/app-icon.png",
       "supportsTablet": true
     },
     "android": {

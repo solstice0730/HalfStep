@@ -2,9 +2,9 @@ import type { CompositeScreenProps } from "@react-navigation/native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useBottomTabBarHeight, type BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { ImageIcon, Plus } from "lucide-react-native";
+import { ImageIcon, Plus, Search, X } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -50,6 +50,8 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
   const [category, setCategory] = useState<CommunityCategoryCode | null>(null);
   const [ageGroup, setAgeGroup] = useState<AgeGroup | null>(null);
   const [ageGroupInitialized, setAgeGroupInitialized] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [posts, setPosts] = useState<CommunityPostListItem[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
     const currentRequest = ++requestId.current;
     setStatus("loading");
     try {
-      const result = await getPosts(accessToken, { category: category ?? undefined, ageGroup: ageGroup ?? undefined });
+      const result = await getPosts(accessToken, { category: category ?? undefined, ageGroup: ageGroup ?? undefined, query: searchQuery });
       if (requestId.current !== currentRequest) return;
       setPosts(result.items);
       setNextCursor(result.nextCursor);
@@ -83,7 +85,7 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
       }
       setStatus("error");
     }
-  }, [accessToken, activeBaby, ageGroupInitialized, category, ageGroup, signOut]);
+  }, [accessToken, activeBaby, ageGroupInitialized, category, ageGroup, searchQuery, signOut]);
 
   useFocusEffect(
     useCallback(() => {
@@ -95,7 +97,7 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
     if (!nextCursor || loadingMore || !accessToken) return;
     setLoadingMore(true);
     try {
-      const result = await getPosts(accessToken, { category: category ?? undefined, ageGroup: ageGroup ?? undefined, cursor: nextCursor });
+      const result = await getPosts(accessToken, { category: category ?? undefined, ageGroup: ageGroup ?? undefined, query: searchQuery, cursor: nextCursor });
       setPosts((current) => [...current, ...result.items]);
       setNextCursor(result.nextCursor);
     } catch {
@@ -132,6 +134,27 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
         </View>
 
         <ScrollView contentContainerStyle={[styles.body, { paddingBottom: tabBarHeight + 96 }]} showsVerticalScrollIndicator={false}>
+          <View style={styles.searchRow}>
+            <Search color={colors.textMuted} size={19} accessibilityElementsHidden />
+            <TextInput
+              accessibilityLabel="커뮤니티 게시글 검색"
+              onChangeText={setSearchInput}
+              onSubmitEditing={() => setSearchQuery(searchInput.trim())}
+              placeholder="제목·내용 검색"
+              placeholderTextColor={colors.textMuted}
+              returnKeyType="search"
+              style={styles.searchInput}
+              value={searchInput}
+            />
+            {searchInput ? (
+              <Pressable accessibilityLabel="검색어 지우기" accessibilityRole="button" onPress={() => { setSearchInput(""); setSearchQuery(""); }} style={styles.searchAction}>
+                <X color={colors.textMuted} size={18} />
+              </Pressable>
+            ) : null}
+            <Pressable accessibilityLabel="검색" accessibilityRole="button" onPress={() => setSearchQuery(searchInput.trim())} style={styles.searchAction}>
+              <Text style={styles.searchActionText}>검색</Text>
+            </Pressable>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
             <Chip active={category === null} label="전체" onPress={() => setCategory(null)} />
             {CATEGORY_OPTIONS.map((option) => (
@@ -161,7 +184,10 @@ export function CommunityScreen({ navigation }: CommunityScreenProps) {
           {status === "error" && <ErrorState message="게시글을 불러오지 못했어요." onRetry={loadFirstPage} />}
 
           {status === "idle" && posts.length === 0 && (
-            <EmptyState title="아직 게시글이 없어요" description="비슷한 시기의 부모와 첫 이야기를 남겨보세요." />
+            <EmptyState
+              title={searchQuery ? "검색 결과가 없어요" : "아직 게시글이 없어요"}
+              description={searchQuery ? "검색어를 바꾸거나 카테고리·월령 필터를 해제해 보세요." : "비슷한 시기의 부모와 첫 이야기를 남겨보세요."}
+            />
           )}
 
           {status === "idle" && posts.length > 0 && (
@@ -258,6 +284,35 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 20,
     paddingTop: 14
+  },
+  searchRow: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.72)",
+    borderColor: "rgba(255,255,255,0.8)",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    minHeight: 48,
+    paddingLeft: 14,
+    paddingRight: 6
+  },
+  searchInput: {
+    color: colors.text,
+    flex: 1,
+    fontSize: 14,
+    minHeight: 44,
+    paddingHorizontal: 10
+  },
+  searchAction: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    minWidth: 44
+  },
+  searchActionText: {
+    color: colors.primaryDark,
+    fontSize: 13,
+    fontWeight: "800"
   },
   filterRow: {
     gap: 8,

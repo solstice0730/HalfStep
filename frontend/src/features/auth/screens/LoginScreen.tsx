@@ -4,6 +4,7 @@ import { Globe, MessageCircle } from "lucide-react-native";
 import * as WebBrowser from "expo-web-browser";
 
 import { env } from "@/config/env";
+import { DemoServerConnection } from "@/shared/components/DemoServerConnection";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useOAuthProvider } from "@/features/auth/hooks/useOAuthProvider";
 import type { OAuthProvider } from "@/features/auth/types/auth";
@@ -53,15 +54,15 @@ export function LoginScreen() {
       <GradientBackdrop />
       <View style={styles.header}>
         <View style={styles.mark}>
-          <Image source={require("../../../../assets/images/login-icon.jpg")} resizeMode="cover" style={styles.markImage} />
+          <Image source={require("../../../../assets/images/app-icon.png")} resizeMode="cover" style={styles.markImage} />
         </View>
-        <Text style={styles.title}>HalfStep</Text>
+        <Text style={styles.title}>반걸음</Text>
         <Text style={styles.subtitle}>아이의 하루 기록을 안전하게 이어가세요.</Text>
       </View>
 
       <GlassSurface radius={theme.radius.xxl} intensity={45} style={styles.panelShell} contentStyle={styles.panel}>
         <Text style={styles.panelTitle}>로그인</Text>
-        <Text style={styles.panelText}>사용 중인 계정으로 인증하고 HalfStep 토큰을 발급받습니다.</Text>
+        <Text style={styles.panelText}>사용 중인 계정으로 반걸음에 로그인해 주세요.</Text>
 
         <View style={styles.buttonStack}>
           {providers.map((option) => (
@@ -70,6 +71,7 @@ export function LoginScreen() {
         </View>
 
         {(__DEV__ || env.enableDevLogin) && <DevLoginButton />}
+        <DemoServerConnection />
       </GlassSurface>
     </View>
   );

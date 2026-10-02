@@ -119,6 +119,7 @@ export interface UpdatePostInput {
 export interface GetPostsParams {
   category?: CommunityCategoryCode;
   ageGroup?: AgeGroup;
+  query?: string;
   cursor?: string | null;
   limit?: number;
 }

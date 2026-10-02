@@ -139,3 +139,36 @@ def test_generate_diary_skips_model_when_only_one_material(monkeypatch):
 
     assert result.generatedByAi is False
     assert llm.calls == []
+
+
+def test_generate_diary_uses_analyzed_photo_as_only_material(monkeypatch):
+    llm = FakeLlm(content=json.dumps({
+        "title": "이불 위의 하루",
+        "content": "하루가 이불 위에 누워 카메라를 바라보는 모습을 사진으로 남겼다.",
+    }))
+    monkeypatch.setattr(ai_service, "_get_llm_client", lambda: llm)
+    photo_scene = "아기가 이불 위에 누워 카메라를 바라보고 있다."
+    payload = _payload(records=DiaryRecords(), memo=None, photoDescriptions=[photo_scene])
+
+    result = ai_service.generate_diary(payload)
+
+    assert result.generatedByAi is True
+    assert photo_scene in llm.calls[0]["user"]
+    assert "이불 위에" in result.content
+
+
+def test_photo_analysis_returns_scene_for_diary(monkeypatch):
+    from app.services.llm import ImageInput
+
+    llm = FakeLlm(content=json.dumps({
+        "captions": ["아기가 이불 위에 누워 카메라를 바라보고 있다."]
+    }))
+    monkeypatch.setattr(ai_service, "_get_llm_client", lambda: llm)
+    monkeypatch.setattr(ai_service, "load_image", lambda _url: ImageInput("image/jpeg", "QUJD"))
+
+    result = ai_service.analyze_photos(["http://localhost:8000/uploads/photo.jpg"])
+
+    assert result.items[0].source == "ai"
+    assert result.items[0].caption == "아기가 이불 위에 누워 카메라를 바라보고 있다."
+    assert len(llm.calls[0]["images"]) == 1
+    assert "표정" in llm.calls[0]["system"]

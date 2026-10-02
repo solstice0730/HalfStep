@@ -40,6 +40,7 @@ export type AskResult = {
   isMedicalRestricted: boolean;
   source: "ai" | "fallback" | "restricted" | "no_data";
   evidence: string[];
+  guidanceSources?: { title: string; url: string }[];
   suggestDiaryLink: boolean;
   context: AskContext | null;
 };

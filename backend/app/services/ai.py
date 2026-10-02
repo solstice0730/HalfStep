@@ -22,6 +22,7 @@ from app.schemas.ai import (
     DiaryGenerateResponse,
     DiaryRecords,
     FeedingRecord,
+    GuidanceSource,
     PhotoAnalyzeResponse,
     PhotoCaption,
     SleepRecord,
@@ -60,6 +61,15 @@ class CareLogRecord:
     type: str
     time: str
     note: str
+
+
+@dataclass(frozen=True)
+class FeedingComparison:
+    latest_amount_ml: int | None
+    latest_type: str | None
+    previous_feed_count: int
+    previous_avg_per_feed_ml: int | None
+    recorded_days: int
 
 
 def generate_daily_summary(
@@ -116,6 +126,11 @@ def answer_question(
     records = _get_daily_records(db, user=user, baby_id=baby_id, target_date=target_date)
     context = _build_ask_context(db, baby=baby, target_date=target_date)
     evidence = _build_evidence(context)
+    feeding_guidance, guidance_sources = _age_feeding_guidance(question, context.ageMonths, context.ageDays)
+    feeding_comparison = (
+        _build_feeding_comparison(db, baby_id=baby_id, target_date=target_date)
+        if feeding_guidance else None
+    )
 
     if _is_medical_question(question):
         return AskResponse(
@@ -128,41 +143,59 @@ def answer_question(
             context=context,
         )
 
+    client = _get_llm_client()
     if not records:
+        if client is not None:
+            try:
+                answer = _generate_general_answer(client, baby, context, question, feeding_guidance)
+                return AskResponse(
+                    answer=answer,
+                    safetyNotice=SAFETY_NOTICE,
+                    isMedicalRestricted=False,
+                    source="ai",
+                    evidence=[],
+                    guidanceSources=guidance_sources,
+                    suggestDiaryLink=False,
+                    context=context,
+                )
+            except LlmError:
+                logger.exception("LLM general question answering failed")
         return AskResponse(
-            answer=NO_RECORD_ANSWER,
+            answer=f"{NO_RECORD_ANSWER} {feeding_guidance}" if feeding_guidance else NO_RECORD_ANSWER,
             safetyNotice=SAFETY_NOTICE,
             isMedicalRestricted=False,
             source="no_data",
-            evidence=evidence,
+            evidence=[],
+            guidanceSources=guidance_sources,
             suggestDiaryLink=False,
             context=context,
         )
 
-    client = _get_llm_client()
     if client is None:
         return AskResponse(
-            answer=_build_rule_based_answer(baby, context),
+            answer=_build_rule_based_answer(baby, context, feeding_comparison) + (f" {feeding_guidance}" if feeding_guidance else ""),
             safetyNotice=SAFETY_NOTICE,
             isMedicalRestricted=False,
             source="fallback",
             evidence=evidence,
+            guidanceSources=guidance_sources,
             suggestDiaryLink=True,
             context=context,
         )
 
     try:
-        answer = _generate_ai_answer(client, baby, context, records, target_date, question)
+        answer = _generate_ai_answer(client, baby, context, records, target_date, question, feeding_guidance, feeding_comparison)
     except LlmError:
         logger.exception("LLM question answering failed")
         if not settings.AI_FALLBACK_ENABLED:
             raise
         return AskResponse(
-            answer=_build_rule_based_answer(baby, context),
+            answer=_build_rule_based_answer(baby, context, feeding_comparison) + (f" {feeding_guidance}" if feeding_guidance else ""),
             safetyNotice=SAFETY_NOTICE,
             isMedicalRestricted=False,
             source="fallback",
             evidence=evidence,
+            guidanceSources=guidance_sources,
             suggestDiaryLink=True,
             context=context,
         )
@@ -173,6 +206,7 @@ def answer_question(
         isMedicalRestricted=False,
         source="ai",
         evidence=evidence,
+        guidanceSources=guidance_sources,
         suggestDiaryLink=True,
         context=context,
     )
@@ -181,7 +215,8 @@ def answer_question(
 def _build_ask_context(db: Session, *, baby: Baby, target_date: date) -> AskContext:
     start_at, end_at = day_bounds(target_date)
     today_logs = calendar_repository.list_logs_in_range(db, baby_id=baby.id, start_at=start_at, end_at=end_at)
-    week_logs = stats.logs_in_days(db, baby_id=baby.id, end_date=target_date, days=7)
+    previous_date = target_date - timedelta(days=1)
+    week_logs = stats.logs_in_days(db, baby_id=baby.id, end_date=previous_date, days=7)
     today_feeding = stats.feeding_stats(today_logs)
     week_feeding = stats.feeding_stats(week_logs)
     return AskContext(
@@ -191,9 +226,44 @@ def _build_ask_context(db: Session, *, baby: Baby, target_date: date) -> AskCont
         todayFeedingTotalMl=today_feeding.total_ml,
         todaySleepMinutes=stats.sleep_total_minutes(today_logs),
         todayDiaperCount=stats.diaper_count(today_logs),
-        weeklyAvgDailyMl=stats.weekly_avg_daily_ml(week_logs, end_date=target_date),
+        weeklyAvgDailyMl=stats.weekly_avg_daily_ml(week_logs, end_date=previous_date),
         avgIntervalMinutes=today_feeding.avg_interval_minutes or week_feeding.avg_interval_minutes,
     )
+
+
+def _build_feeding_comparison(db: Session, *, baby_id: int, target_date: date) -> FeedingComparison:
+    start_at, end_at = day_bounds(target_date)
+    today = stats.feeding_logs(calendar_repository.list_logs_in_range(db, baby_id=baby_id, start_at=start_at, end_at=end_at))
+    previous_date = target_date - timedelta(days=1)
+    previous = stats.feeding_logs(stats.logs_in_days(db, baby_id=baby_id, end_date=previous_date, days=7))
+    latest = today[-1] if today else None
+    # 모유 시간 기록이나 이유식 양을 분유 1회량과 섞어 평균 내지 않는다.
+    comparable = [
+        log for log in previous
+        if latest is not None and log.feeding_type == latest.feeding_type and log.amount_ml is not None
+    ]
+    days = {to_app_timezone(log.occurred_at).date() for log in comparable}
+    return FeedingComparison(
+        latest_amount_ml=latest.amount_ml if latest else None,
+        latest_type=latest.feeding_type if latest else None,
+        previous_feed_count=len(comparable),
+        previous_avg_per_feed_ml=round(sum(log.amount_ml for log in comparable) / len(comparable)) if comparable else None,
+        recorded_days=len(days),
+    )
+
+
+def _feeding_comparison_lines(comparison: FeedingComparison) -> str:
+    if comparison.latest_amount_ml is None:
+        return "- 오늘 마지막 수유량: 수치 기록 없음\n- 같은 종류의 과거 수유와 1회량 비교: 불가"
+    lines = [f"- 오늘 마지막 수유량: {comparison.latest_amount_ml}ml ({comparison.latest_type or '종류 미기록'})"]
+    if comparison.previous_avg_per_feed_ml is not None:
+        lines.append(
+            f"- 직전 7일 중 기록된 {comparison.recorded_days}일의 같은 종류 수유 "
+            f"{comparison.previous_feed_count}회, 1회 평균 {comparison.previous_avg_per_feed_ml}ml"
+        )
+    else:
+        lines.append("- 직전 7일 같은 종류의 수치 기록이 없어 1회량 비교 불가")
+    return "\n".join(lines)
 
 
 def _build_evidence(context: AskContext) -> list[str]:
@@ -209,6 +279,30 @@ def _build_evidence(context: AskContext) -> list[str]:
         evidence.append(f"오늘 배변 {context.todayDiaperCount}회")
     evidence.append("최근 7일 기록")
     return evidence
+
+
+def _age_feeding_guidance(question: str, age_months: int, age_days: int) -> tuple[str | None, list[GuidanceSource]]:
+    if not any(term in question for term in ("먹", "수유", "분유", "모유", "이유식", "밥", "식사")):
+        return None, []
+
+    who = GuidanceSource(title="WHO 월령별 이유식 안내", url="https://www.who.int/health-topics/complementary-feeding")
+    if age_months < 6:
+        nhs = GuidanceSource(
+            title="NHS 분유 수유량 안내",
+            url="https://www.derbyshirefamilyhealthservice.nhs.uk/our-services/0-5-years/infant-feeding-and-nutrition/formula-feeding",
+        )
+        return (
+            f"생후 {age_days}일에는 모유 또는 분유 수유가 중심이다. 분유만 먹는 영아의 일반적인 "
+            "24시간 섭취량 참고 범위는 체중 1kg당 150~200mL이지만 개인 목표량은 아니다. "
+            "모유·혼합 수유에는 이 수치를 그대로 적용하지 않으며, 체중과 하루 전체 수유 기록이 "
+            "없으면 이 아이가 충분히 먹는지 수치로 판단할 수 없다. 이유식은 보통 생후 6개월 무렵 시작한다.",
+            [nhs, who],
+        )
+    if age_months <= 8:
+        return f"생후 {age_days}일 무렵의 이유식은 모유·분유와 함께 하루 2~3회가 WHO 일반 안내다. 아이의 식욕·포만 신호에 맞춘다.", [who]
+    if age_months < 24:
+        return f"생후 {age_days}일 무렵의 이유식·식사는 하루 3~4회가 WHO 일반 안내다. 12개월 이후에는 필요에 따라 간식 1~2회를 더할 수 있다.", [who]
+    return None, []
 
 
 def _context_lines(context: AskContext) -> str:
@@ -290,33 +384,32 @@ def _build_rule_based_summary(records: list[CareLogRecord]) -> str:
     return "오늘은 " + ", ".join(_build_highlights(records)) + " 기록되었어요."
 
 
-def _build_rule_based_answer(baby: Baby, context: AskContext) -> str:
-    """LLM 없이도 영상의 답변처럼 오늘 기록과 최근 7일 평균을 근거로 문장을 만든다."""
+def _build_rule_based_answer(baby: Baby, context: AskContext, comparison: FeedingComparison | None = None) -> str:
+    """LLM 장애 시에도 미완성 오늘 총량을 지난 하루 총량과 비교하지 않는다."""
     sentences = [f"{with_i(baby.name)}의 오늘 기록을 확인했어요."]
     if context.todayFeedingCount:
         feeding = f"수유 {context.todayFeedingCount}회"
         if context.todayFeedingTotalMl:
             feeding += f", 총 {context.todayFeedingTotalMl}ml"
-        comparison = ""
-        if context.weeklyAvgDailyMl and context.todayFeedingTotalMl:
-            ratio = context.todayFeedingTotalMl / context.weeklyAvgDailyMl
-            if ratio > 1.15:
-                comparison = "로 최근 7일 평균보다 조금 많은 편이고"
-            elif ratio < 0.85:
-                comparison = "로 최근 7일 평균보다 조금 적은 편이고"
-            else:
-                comparison = "로 최근 7일 같은 시간대와 비슷하고"
         interval = (
-            f" 수유 간격도 {stats.format_interval(context.avgIntervalMinutes)}으로 일정해요."
+            f" 기록상 평균 수유 간격은 {stats.format_interval(context.avgIntervalMinutes)}이에요."
             if context.avgIntervalMinutes
             else " 수유 간격도 함께 살펴보면 좋아요."
         )
-        sentences.append(f"{feeding}{comparison}{interval}" if comparison else f"{feeding}예요.{interval}")
+        sentences.append(f"{feeding}가 기록됐어요.{interval}")
+        if comparison and comparison.latest_amount_ml is not None and comparison.previous_avg_per_feed_ml is not None:
+            sentences.append(
+                f"가장 최근 1회 {comparison.latest_amount_ml}ml는 직전 7일 중 기록된 "
+                f"{comparison.recorded_days}일의 같은 종류 수유 {comparison.previous_feed_count}회 평균 "
+                f"{comparison.previous_avg_per_feed_ml}ml와 비교할 수 있어요."
+            )
+        if comparison is not None:
+            sentences.append("아직 하루가 끝나지 않았다면 현재 총량을 과거 하루 평균과 비교해 부족하다고 판단할 수는 없어요.")
     if context.todaySleepMinutes:
         sentences.append(f"오늘 수면은 총 {stats.format_minutes(context.todaySleepMinutes)} 기록됐어요.")
     if context.todayDiaperCount:
         sentences.append(f"배변은 {context.todayDiaperCount}회 기록됐어요.")
-    sentences.append("다음 수유는 시간보다 입을 오물거리거나 손을 빠는 신호를 먼저 살펴보세요.")
+    sentences.append("다음 수유 신호와 젖은 기저귀, 체중 변화를 함께 살펴보세요.")
     return " ".join(sentences)
 
 
@@ -345,6 +438,8 @@ def _generate_ai_answer(
     records: list[CareLogRecord],
     target_date: date,
     question: str,
+    feeding_guidance: str | None,
+    feeding_comparison: FeedingComparison | None,
 ) -> str:
     prompt = (
         f"아기 이름: {baby.name}\n"
@@ -352,19 +447,53 @@ def _generate_ai_answer(
         f"{target_date.isoformat()} 하루 기록:\n"
         f"{_records_to_prompt_lines(records)}\n\n"
         f"부모의 질문: {question}\n\n"
-        "위 기록과 맥락만 근거로 2~3문장 한국어로 답변해줘. 첫 문장은 오늘 기록을 확인했다는 말로 시작하고, "
-        "최근 7일 평균과 비교해 설명해줘. 의료 진단, 처방, 병명 추정은 하지 말고, "
-        "기록에 없는 내용은 추측하지 마. 마지막은 부모가 다음에 살펴볼 아이 신호를 한 가지 제안해줘."
+        + (f"직전 7일의 같은 종류 수유 비교:\n{_feeding_comparison_lines(feeding_comparison)}\n\n" if feeding_comparison else "")
+        + (f"월령별 일반 안내(이 아이의 실제 섭취량이 아님): {feeding_guidance}\n\n" if feeding_guidance else "")
+        +
+        "질문에 직접 답변해줘. 아이 기록과 관련된 질문이면 해당 날짜의 기록을 참고하고, "
+        "일반적인 육아 질문이면 일반 정보로 답하되 아이의 개인 상태를 추측하지 마. "
+        "월령별 일반 안내가 있으면 생후 일수와 그 일반 기준을 구분해 설명해줘. 기준을 이 아이의 목표량이나 진단으로 단정하지 마. "
+        + (
+            "직전 7일의 기록된 날짜 수와 같은 종류 수유 횟수를 밝히고, 충분하지 않으면 비교의 한계를 설명해. "
+            "미완성인 오늘 총량과 과거 하루 전체 평균을 비교하거나 같은 시간대 자료가 없는데 시간대 비교를 했다고 말하지 마. "
+            "현재 기록에서 확인되는 사실, 과거 1회량과의 차이, 그 차이의 해석상 한계, 다음에 관찰할 점을 4~6문장으로 설명해. "
+            if feeding_comparison else ""
+        )
+        +
+        "의료 진단, 처방, 병명 추정은 하지 마."
     )
-    return _complete(client, system=_SYSTEM_PROMPT, user=prompt)
+    return _complete(client, system=_FEEDING_SYSTEM_PROMPT if feeding_guidance else _SYSTEM_PROMPT, user=prompt, max_tokens=650 if feeding_guidance else 300)
+
+
+def _generate_general_answer(client: LlmClient, baby: Baby, context: AskContext, question: str, feeding_guidance: str | None) -> str:
+    prompt = (
+        f"아기 이름: {baby.name}\n"
+        f"월령: 생후 {context.ageDays}일 ({context.ageMonths}개월)\n"
+        "오늘 확인할 수 있는 아이 기록은 없음.\n"
+        f"부모의 질문: {question}\n\n"
+        + (f"월령별 일반 안내(이 아이의 실제 섭취량이 아님): {feeding_guidance}\n\n" if feeding_guidance else "")
+        +
+        "질문에 직접 답해줘. 월령은 참고하되 이 아이의 현재 상태나 "
+        "수유·수면·발달 사실을 아는 척하지 마. 일반적인 돌봄 정보와 부모가 직접 확인할 수 있는 "
+        "행동만 제안해줘. 월령별 일반 안내가 있으면 생후 일수와 일반 기준을 설명하되 이 아이의 "
+        "목표량으로 단정하지 마. 오늘 기록을 확인했다거나 지난 기록과 비교했다는 말은 하지 마. "
+        "수유 질문이면 일반적으로 살펴볼 신호와 기록하면 도움이 될 항목을 3~5문장으로 설명해."
+    )
+    return _complete(client, system=_FEEDING_SYSTEM_PROMPT if feeding_guidance else _SYSTEM_PROMPT, user=prompt, max_tokens=650 if feeding_guidance else 300)
 
 
 _SYSTEM_PROMPT = (
-    "너는 아기의 기록을 늘 지켜보고 있는 육아코치야. 부모에게 말하듯 따뜻하고 담백한 해요체로 답해.\n"
+    "너는 부모의 육아 질문을 돕는 코치야. 제공된 기록이 있을 때만 그 기록을 참고하고, 따뜻하고 담백한 해요체로 답해.\n"
     "- 2~3문장, 한 문단으로만 답하고 목록·이모지·마크다운·인사말은 쓰지 않는다.\n"
     "- 숫자(횟수, ml, 간격)는 주어진 맥락의 값을 그대로 쓰고, 기록에 없는 내용은 추측하지 않는다.\n"
-    "- '기록에 따르면', '데이터', 'AI', '분석 결과' 같은 말은 쓰지 않는다. 그냥 아기의 하루를 지켜본 사람처럼 말한다.\n"
+    "- 월령별 일반 안내가 제공되지 않으면 평균·권장량 숫자를 만들어 내지 않는다.\n"
+    "- '기록에 따르면', '데이터', 'AI', '분석 결과' 같은 말은 쓰지 않는다. 실제로 알 수 없는 아이의 하루를 본 것처럼 말하지 않는다.\n"
     "- 의료 진단, 처방, 병명 추정은 절대 하지 않는다."
+)
+
+_FEEDING_SYSTEM_PROMPT = _SYSTEM_PROMPT.replace(
+    "- 2~3문장, 한 문단으로만 답하고 목록·이모지·마크다운·인사말은 쓰지 않는다.",
+    "- 수유 질문은 4~6문장으로 충분히 설명한다. 목록·이모지·인사말은 쓰지 않는다."
 )
 
 
@@ -384,7 +513,7 @@ DIARY_SYSTEM_PROMPT = (
     "- 주어진 기록·메모·사진 설명·대화에 있는 사실만 쓰고, 없는 행동·감정·발달 상황을 지어내지 않는다.\n"
     "- 수유, 수면, 배변의 횟수와 시간은 주어진 값과 반드시 일치시킨다. 수면 시간은 반올림하지 않고 그대로 쓴다(예: 2시간 47분).\n"
     "- 수면 기록이 없으면 잠에 대해 쓰지 않고, 메모·사진·대화가 없으면 기분·행동·분위기를 덧붙이지 않는다.\n"
-    "- 사진 설명이 있으면 그 장면 하나를 문장 속에 자연스럽게 녹이고, 없으면 사진 얘기를 하지 않는다.\n"
+    "- 사진 설명이 있으면 눈으로 확인된 장면을 적어도 하나는 일기 문장 속에 자연스럽게 녹이고, 없으면 사진 얘기를 하지 않는다.\n"
     "- 기록이 한두 개뿐이면 1~2문장으로만 짧게 쓴다. 예: 수유 1회만 있으면 "
     '{"title": "모유 한 번 먹은 아침", "content": "오늘 하루는 오전에 모유를 한 번 먹었다. 그 밖에 남긴 기록은 없어서 짧게 적어 둔다."} 정도로 끝낸다.\n'
     "- 질병이나 건강 상태를 진단·단정하지 않고 약이나 의료 판단을 쓰지 않는다.\n"
@@ -401,7 +530,7 @@ DIARY_SYSTEM_PROMPT = (
 
 
 DIARY_AI_BUSY_DETAIL = "일기 작성이 잠시 지연되고 있어요. 몇 초 뒤 다시 시도해 주세요."
-# 재료가 이보다 적으면 모델을 부르지 않는다. 예시 문장을 베끼거나 없는 일을 지어낼 여지가 크고 비용만 든다.
+# 사진 설명이 없을 때 재료가 이보다 적으면 모델을 부르지 않는다. 없는 일을 지어낼 여지가 크다.
 MIN_MATERIALS_FOR_AI = 2
 
 
@@ -423,7 +552,8 @@ def generate_diary(payload: DiaryGenerateRequest) -> DiaryGenerateResponse:
     )
 
     client = _get_llm_client()
-    if client is None or _material_count(payload) < MIN_MATERIALS_FOR_AI:
+    # 사진 한 장의 장면 설명만 있어도 일기의 소재가 되므로 AI 초안을 만들 수 있다.
+    if client is None or (_material_count(payload) < MIN_MATERIALS_FOR_AI and not payload.photoDescriptions):
         return fallback
 
     try:
@@ -552,9 +682,12 @@ def _build_diary_prompt(payload: DiaryGenerateRequest) -> str:
 
 
 PHOTO_CAPTION_SYSTEM_PROMPT = (
-    "너는 아기 사진의 장면을 짧게 설명하는 보조 도구야. 각 사진마다 아기의 표정이나 행동을 "
-    "한국어 6~12자 명사구로 묘사해. 예: '수유 후 안정', '눈맞춤', '고개 들기', '편안한 낮잠'. "
-    "건강 상태를 판단하지 말고, 사람을 식별하지 마. "
+    "너는 육아일기에 들어갈 사진의 장면을 설명하는 보조 도구야. 각 사진에서 눈으로 확인되는 "
+    "아기의 표정·자세·행동과 주변 장면만 한국어 한 문장(20~80자)으로 구체적으로 적어. "
+    "웃는 입, 찡그린 얼굴, 감은 눈처럼 표정이 분명히 보이면 표정을 먼저 적어. "
+    "표정이 흐리거나 보이지 않으면 억지로 추측하지 마. "
+    "예: '아기가 입꼬리를 올려 웃으며 이불 위에 누워 있다.' "
+    "사진만으로 알 수 없는 수유·수면 사실, 감정, 건강 상태, 사람의 신원은 추측하지 마. "
     '반드시 {"captions": [string, ...]} JSON으로만, 입력 사진 순서대로 응답한다.'
 )
 
@@ -594,7 +727,7 @@ def analyze_photos(photo_urls: list[str]) -> PhotoAnalyzeResponse:
     items = []
     for index, url in enumerate(photo_urls):
         caption = captions[index] if index < len(captions) and isinstance(captions[index], str) else None
-        caption = caption.strip()[:20] if caption else None
+        caption = caption.strip()[:80] if caption else None
         items.append(PhotoCaption(url=url, caption=caption or None, source="ai" if caption else "fallback"))
     return PhotoAnalyzeResponse(items=items)
 
@@ -631,5 +764,5 @@ def _parse_diary_json(content: str) -> dict:
         raise ValueError("AI response is not valid JSON") from exc
 
 
-def _complete(client: LlmClient, *, system: str, user: str) -> str:
-    return client.complete(system=system, user=user, max_tokens=300, temperature=0.4)
+def _complete(client: LlmClient, *, system: str, user: str, max_tokens: int = 300) -> str:
+    return client.complete(system=system, user=user, max_tokens=max_tokens, temperature=0.4)

@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -47,6 +48,8 @@ type ChatMessage =
       role: "assistant";
       text: string;
       evidence?: string[];
+      guidanceSources?: AskResult["guidanceSources"];
+      source?: AskResult["source"];
       question?: string;
       /** "오늘 일기에 추가" 제안 카드 상태 */
       diaryLink?: "pending" | "accepted" | "dismissed";
@@ -96,6 +99,8 @@ export function AiChatScreen({ navigation }: Props) {
           role: "assistant",
           text: result.answer,
           evidence: result.evidence,
+          guidanceSources: result.guidanceSources,
+          source: result.source,
           question,
           diaryLink: result.suggestDiaryLink ? "pending" : undefined
         }
@@ -222,12 +227,25 @@ export function AiChatScreen({ navigation }: Props) {
                       </>
                     ) : (
                       <>
-                        <Text style={styles.assistantLead}>{withUi(babyName)} 오늘 기록을 확인했어요.</Text>
+                        <Text style={styles.assistantLead}>
+                          {message.source === "restricted"
+                            ? "의료 판단은 대신할 수 없어요."
+                            : message.evidence?.length
+                              ? `${withUi(babyName)} 오늘 기록을 확인했어요.`
+                              : "궁금한 점에 답할게요."}
+                        </Text>
                         <Text style={styles.assistantText}>{stripLead(message.text, babyName)}</Text>
                         {message.evidence && message.evidence.length > 0 && (
-                          <Text style={styles.assistantFoot}>근거 · {message.evidence.join(" · ")}</Text>
+                          <Text style={styles.assistantFoot}>참고 기록 · {message.evidence.join(" · ")}</Text>
                         )}
-                        <Text style={styles.assistantFoot}>{SAFETY_SHORT}</Text>
+                        {message.guidanceSources?.map((source) => (
+                          <Pressable accessibilityRole="link" accessibilityLabel={`${source.title} 원문 열기`} key={source.url} onPress={() => void Linking.openURL(source.url)}>
+                            <Text style={styles.assistantFoot}>자료 · {source.title} ↗</Text>
+                          </Pressable>
+                        ))}
+                        <Text style={styles.assistantFoot}>
+                          {message.evidence?.length ? SAFETY_SHORT : "일반 육아 정보예요. 아이 상태는 직접 확인해 주세요."}
+                        </Text>
                       </>
                     )}
                   </View>

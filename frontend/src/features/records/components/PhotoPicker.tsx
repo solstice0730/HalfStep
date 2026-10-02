@@ -39,6 +39,8 @@ export function PhotoPicker({ photos, onAdd, onRemove, onDescriptionChange, maxP
 
   const statusLabel = busy
     ? "사진 정리 중…"
+    : photos.some((photo) => photo.status === "error")
+      ? "설명이 필요한 사진이 있어요"
     : photos.length > 0
       ? `${readyCount}장 준비됐어요`
       : `${photos.length}/${maxPhotos}`;
@@ -91,7 +93,7 @@ export function PhotoPicker({ photos, onAdd, onRemove, onDescriptionChange, maxP
                   />
                 ) : (
                   <Pressable accessibilityLabel="사진 설명 편집" onPress={() => setEditingUri(photo.uri)}>
-                    <Text numberOfLines={1} style={[styles.captionChip, !caption && styles.captionChipMuted]}>
+                    <Text numberOfLines={2} style={[styles.captionChip, !caption && styles.captionChipMuted]}>
                       {caption ?? (photo.status === "error" ? "설명 추가" : "준비 중")}
                     </Text>
                   </Pressable>
@@ -177,7 +179,7 @@ const styles = StyleSheet.create({
     width: 100
   },
   photoOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     backgroundColor: "rgba(32,26,23,0.35)",
     borderRadius: 16,

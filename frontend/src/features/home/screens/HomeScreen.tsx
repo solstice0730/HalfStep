@@ -598,8 +598,9 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
 
       {currentPage === 1 && (
         <Pressable
+          accessibilityRole="button"
           accessibilityLabel="육아코치 열기"
-          style={[styles.chatFloat, { bottom: tabBarHeight + 14 }]}
+          style={[styles.chatFloat, { bottom: tabBarHeight + 70 }]}
           onPress={() => navigation.navigate("AiChat")}
         >
           <Image source={require("../../../../assets/images/chatbot-home.png")} resizeMode="contain" style={styles.chatFloatImage} />
@@ -821,7 +822,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 2,
     justifyContent: "flex-end",
-    marginTop: 10
+    marginTop: 10,
+    paddingRight: 70
   },
   curationFooterText: {
     color: colors.primary,

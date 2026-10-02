@@ -19,6 +19,7 @@ import { getMyProfile, updateBabyName } from "@/features/mypage/services/mypageS
 import type { MyPageBaby, MyPageProfile } from "@/features/mypage/types/mypage";
 import { SubscriptionScreen } from "@/features/subscription/screens/SubscriptionScreen";
 import { GlassSurface } from "@/shared/components/GlassSurface";
+import { DemoServerConnection } from "@/shared/components/DemoServerConnection";
 import { GradientBackdrop } from "@/shared/components/GradientBackdrop";
 import { colors } from "@/shared/constants/colors";
 import { theme } from "@/shared/constants/theme";
@@ -165,6 +166,7 @@ export function MyPageScreen({ onClose }: MyPageScreenProps) {
             subtitle="구독 기능 준비 중"
             onPress={() => setSubscriptionOpen(true)}
           />
+          <DemoServerConnection onConnected={() => void load()} />
 
           <Text style={styles.sectionLabel}>이용 안내</Text>
           <SettingsRow

@@ -13,13 +13,14 @@ router = APIRouter(prefix="/posts", tags=["community"])
 def list_posts(
     category: str | None = None,
     age_group: str | None = Query(default=None, alias="ageGroup"),
+    q: str | None = Query(default=None, max_length=80),
     cursor: str | None = None,
     limit: int = Query(default=20, ge=1, le=50),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
     posts, next_cursor, has_next = community_service.list_community_posts(
-        db, category=category, age_group=age_group, cursor=cursor, limit=limit
+        db, category=category, age_group=age_group, query=q, cursor=cursor, limit=limit
     )
     states = community_service.reaction_state(db, posts=posts, user_id=current_user.id)
     return {

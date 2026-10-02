@@ -39,12 +39,18 @@ class AskContext(BaseModel):
     avgIntervalMinutes: int | None
 
 
+class GuidanceSource(BaseModel):
+    title: str
+    url: str
+
+
 class AskResponse(BaseModel):
     answer: str
     safetyNotice: str
     isMedicalRestricted: bool
     source: str  # "ai" | "fallback" | "restricted" | "no_data"
     evidence: list[str] = Field(default_factory=list)
+    guidanceSources: list[GuidanceSource] = Field(default_factory=list)
     suggestDiaryLink: bool = False
     context: AskContext | None = None
 

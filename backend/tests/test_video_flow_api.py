@@ -3,6 +3,7 @@
 
 import unittest
 from datetime import date, datetime, timedelta, timezone
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -155,6 +156,38 @@ class VideoFlowApiTest(unittest.TestCase):
         self.assertTrue(data["answer"].startswith("하린이의 오늘 기록을 확인했어요."))
         self.assertIn("총 600ml", data["answer"])
         self.assertIn("약 3시간", data["answer"])
+        self.assertIn("가장 최근 1회 160ml", data["answer"])
+        self.assertIn("수유 28회 평균 150ml", data["answer"])
+        self.assertNotIn("같은 시간대와 비슷", data["answer"])
+
+    def test_short_feeding_question_prompts_detailed_same_type_comparison(self) -> None:
+        self.seed_week(TODAY - timedelta(days=1), 150)
+        self.feed(TODAY, 8, 120)
+
+        class FakeLlm:
+            provider = "fake"
+
+            def complete(self, **kwargs):
+                self.call = kwargs
+                return "직전 기록과 비교해 설명한 답변입니다."
+
+        llm = FakeLlm()
+        with patch.object(ai_service, "_get_llm_client", return_value=llm):
+            response = self.client.post(
+                "/api/ai/ask",
+                json={"babyId": self.baby.id, "date": TODAY.isoformat(), "question": "아이가 밥을 잘 안먹어"},
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()["data"]
+        self.assertEqual(data["source"], "ai")
+        self.assertEqual(data["context"]["todayFeedingTotalMl"], 120)
+        self.assertEqual(data["context"]["weeklyAvgDailyMl"], 600)
+        self.assertIn("오늘 마지막 수유량: 120ml", llm.call["user"])
+        self.assertIn("같은 종류 수유 28회, 1회 평균 150ml", llm.call["user"])
+        self.assertIn("미완성인 오늘 총량과 과거 하루 전체 평균을 비교하거나", llm.call["user"])
+        self.assertIn("4~6문장", llm.call["system"])
+        self.assertEqual(llm.call["max_tokens"], 650)
 
     def test_ask_without_records_does_not_suggest_diary(self) -> None:
         response = self.client.post(
@@ -164,6 +197,49 @@ class VideoFlowApiTest(unittest.TestCase):
         self.assertEqual(data["source"], "no_data")
         self.assertFalse(data["suggestDiaryLink"])
         self.assertEqual(data["context"]["todayFeedingCount"], 0)
+
+    def test_general_question_uses_ai_even_without_records(self) -> None:
+        class FakeLlm:
+            provider = "fake"
+
+            def complete(self, **kwargs):
+                self.prompt = kwargs["user"]
+                return "아기와 눈을 맞추며 짧게 이야기해 보세요. 반응을 보면서 쉬어 가면 좋아요."
+
+        llm = FakeLlm()
+        with patch.object(ai_service, "_get_llm_client", return_value=llm):
+            response = self.client.post(
+                "/api/ai/ask", json={"babyId": self.baby.id, "date": TODAY.isoformat(), "question": "아기랑 어떻게 놀아줄까?"}
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()["data"]
+        self.assertEqual(data["source"], "ai")
+        self.assertEqual(data["evidence"], [])
+        self.assertFalse(data["suggestDiaryLink"])
+        self.assertIn("아기랑 어떻게 놀아줄까?", llm.prompt)
+        self.assertIn("오늘 확인할 수 있는 아이 기록은 없음", llm.prompt)
+
+    def test_feeding_question_includes_age_guidance_and_source(self) -> None:
+        class FakeLlm:
+            provider = "fake"
+
+            def complete(self, **kwargs):
+                self.prompt = kwargs["user"]
+                return "생후 118일에는 수유가 중심이에요. 분유만 먹는 경우 체중별 일반 범위를 참고하고 아이 기록도 함께 살펴보세요."
+
+        llm = FakeLlm()
+        with patch.object(ai_service, "_get_llm_client", return_value=llm):
+            response = self.client.post(
+                "/api/ai/ask", json={"babyId": self.baby.id, "date": TODAY.isoformat(), "question": "아이가 밥을 잘 안 먹어"}
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()["data"]
+        self.assertEqual(data["source"], "ai")
+        self.assertIn("체중 1kg당 150~200mL", llm.prompt)
+        self.assertTrue(any(source["title"].startswith("NHS") for source in data["guidanceSources"]))
+        self.assertFalse(data["suggestDiaryLink"])
 
     # --- 03→04 일기 재료 ------------------------------------------------------------
 

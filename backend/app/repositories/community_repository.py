@@ -1,4 +1,4 @@
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.community import CommunityCategory, CommunityPost, CommunityPostReaction
@@ -20,6 +20,7 @@ def list_posts(
     category_code: str | None,
     age_range: tuple[int, int] | None,
     age_independent: bool,
+    search_term: str | None,
     before_id: int | None,
     limit: int,
 ) -> list[CommunityPost]:
@@ -41,6 +42,13 @@ def list_posts(
             CommunityPost.baby_age_months >= age_range[0],
             CommunityPost.baby_age_months <= age_range[1],
         )
+    if search_term:
+        escaped = search_term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        statement = statement.where(or_(
+            CommunityPost.title.ilike(pattern, escape="\\"),
+            CommunityPost.content.ilike(pattern, escape="\\"),
+        ))
     if before_id is not None:
         statement = statement.where(CommunityPost.id < before_id)
     return list(db.scalars(statement).all())

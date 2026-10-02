@@ -25,6 +25,7 @@ def list_community_posts(
     *,
     category: str | None,
     age_group: str | None,
+    query: str | None = None,
     cursor: str | None,
     limit: int,
 ) -> tuple[list[CommunityPost], str | None, bool]:
@@ -42,6 +43,7 @@ def list_community_posts(
         category_code=category_code,
         age_range=AGE_GROUPS.get(normalized_age_group),
         age_independent=normalized_age_group == "ALL_AGES",
+        search_term=query.strip() if query else None,
         before_id=before_id,
         limit=limit + 1,
     )
