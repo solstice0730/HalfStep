@@ -16,7 +16,7 @@ type BlobProps = {
 // 웹/iOS/Android 모두에서 동일하게 부드러운 빛번짐을 만든다.
 function Blob({ size, color, opacity, gradientId, style }: BlobProps) {
   return (
-    <View pointerEvents="none" style={[styles.blob, { width: size, height: size }, style]}>
+    <View style={[styles.blob, { width: size, height: size }, style]}>
       <Svg width={size} height={size}>
         <Defs>
           <RadialGradient id={gradientId} cx="50%" cy="50%" r="50%">
@@ -34,7 +34,7 @@ function Blob({ size, color, opacity, gradientId, style }: BlobProps) {
 // 색 변화를 줘야 유리 질감이 살아나므로, 절대 위치로 한 번만 깔고 그 위에 콘텐츠를 올린다.
 export function GradientBackdrop() {
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+    <View style={[StyleSheet.absoluteFill, styles.backdrop]}>
       <LinearGradient
         colors={[colors.backgroundTop, colors.background, colors.backgroundBottom]}
         start={{ x: 0.1, y: 0 }}
@@ -49,6 +49,10 @@ export function GradientBackdrop() {
 }
 
 const styles = StyleSheet.create({
+  backdrop: {
+    overflow: "hidden",
+    pointerEvents: "none"
+  },
   blob: {
     position: "absolute"
   }

@@ -6,6 +6,9 @@
     "orientation": "portrait",
     "scheme": "halfstep",
     "userInterfaceStyle": "light",
+    "web": {
+      "lang": "ko"
+    },
     "plugins": [
       [
         "expo-camera",

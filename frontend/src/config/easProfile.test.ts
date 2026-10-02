@@ -21,3 +21,15 @@ test("builds a static iOS Simulator app for Appetize with preview variables", ()
     }
   });
 });
+
+test("marks the web document as Korean for assistive technology", () => {
+  const configPath = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    "../../app.json"
+  );
+  const appConfig = JSON.parse(
+    readFileSync(configPath, "utf8")
+  );
+
+  assert.equal(appConfig.expo.web.lang, "ko");
+});

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Globe, MessageCircle } from "lucide-react-native";
 import * as WebBrowser from "expo-web-browser";
 
@@ -51,26 +51,37 @@ export function LoginScreen() {
   return (
     <View style={styles.root}>
       <GradientBackdrop />
-      <View style={styles.header}>
-        <View style={styles.mark}>
-          <Image source={require("../../../../assets/images/login-icon.jpg")} resizeMode="cover" style={styles.markImage} />
+      <ScrollView
+        contentContainerStyle={styles.content}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <View style={styles.mark}>
+            <Image
+              accessible={false}
+              source={require("../../../../assets/images/login-icon.jpg")}
+              resizeMode="cover"
+              style={styles.markImage}
+            />
+          </View>
+          <Text style={styles.title}>HalfStep</Text>
+          <Text style={styles.subtitle}>아이의 하루 기록을 안전하게 이어가세요.</Text>
         </View>
-        <Text style={styles.title}>HalfStep</Text>
-        <Text style={styles.subtitle}>아이의 하루 기록을 안전하게 이어가세요.</Text>
-      </View>
 
-      <GlassSurface radius={theme.radius.xxl} intensity={45} style={styles.panelShell} contentStyle={styles.panel}>
-        <Text style={styles.panelTitle}>로그인</Text>
-        <Text style={styles.panelText}>사용 중인 계정으로 인증하고 HalfStep 토큰을 발급받습니다.</Text>
+        <GlassSurface radius={theme.radius.xxl} intensity={45} style={styles.panelShell} contentStyle={styles.panel}>
+          <Text accessibilityRole="header" style={styles.panelTitle}>로그인</Text>
+          <Text style={styles.panelText}>사용 중인 계정으로 인증하고 HalfStep 토큰을 발급받습니다.</Text>
 
-        <View style={styles.buttonStack}>
-          {providers.map((option) => (
-            <OAuthLoginButton key={option.provider} option={option} />
-          ))}
-        </View>
+          <View style={styles.buttonStack}>
+            {providers.map((option) => (
+              <OAuthLoginButton key={option.provider} option={option} />
+            ))}
+          </View>
 
-        {__DEV__ && <DevLoginButton />}
-      </GlassSurface>
+          {__DEV__ && <DevLoginButton />}
+        </GlassSurface>
+      </ScrollView>
     </View>
   );
 }
@@ -96,10 +107,17 @@ function DevLoginButton() {
 
   return (
     <View style={styles.devLoginWrap}>
-      <Pressable disabled={isSigningIn} onPress={handlePress} style={[styles.devButton, isSigningIn && styles.disabledButton]}>
+      <Pressable
+        accessibilityLabel="테스트 계정으로 로그인"
+        accessibilityRole="button"
+        accessibilityState={{ busy: isSigningIn, disabled: isSigningIn }}
+        disabled={isSigningIn}
+        onPress={handlePress}
+        style={[styles.devButton, isSigningIn && styles.disabledButton]}
+      >
         {isSigningIn ? <ActivityIndicator color={colors.primaryDark} /> : <Text style={styles.devButtonText}>테스트 계정으로 로그인 (dev)</Text>}
       </Pressable>
-      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+      {errorMessage ? <Text accessibilityLiveRegion="assertive" style={styles.errorText}>{errorMessage}</Text> : null}
     </View>
   );
 }
@@ -150,6 +168,9 @@ function OAuthLoginButton({ option }: { option: ProviderOption }) {
   return (
     <View>
       <Pressable
+        accessibilityLabel={option.label}
+        accessibilityRole="button"
+        accessibilityState={{ busy: isSigningIn, disabled: !canStart || isSigningIn }}
         disabled={!canStart || isSigningIn}
         style={[
           styles.oauthButton,
@@ -168,7 +189,7 @@ function OAuthLoginButton({ option }: { option: ProviderOption }) {
         )}
       </Pressable>
       {!canStart && helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
-      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+      {errorMessage ? <Text accessibilityLiveRegion="assertive" style={styles.errorText}>{errorMessage}</Text> : null}
     </View>
   );
 }
@@ -200,9 +221,13 @@ function getProviderHelper(provider: OAuthProvider) {
 
 const styles = StyleSheet.create({
   root: {
-    flex: 1,
+    flex: 1
+  },
+  content: {
+    flexGrow: 1,
     justifyContent: "center",
-    padding: 22
+    padding: 22,
+    paddingBottom: 30
   },
   header: {
     alignItems: "center",
